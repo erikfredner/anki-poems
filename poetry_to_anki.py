@@ -114,21 +114,45 @@ def format_metadata_display(metadata, title=None, author=None):
     return '<br>'.join(lines)
 
 
-def parse_poem(text: str):
-    """Return list[list[str]] → stanzas→lines with preserved whitespace."""
+def parse_poem(text: str, wrap_lines=True, max_line_length=65):
+    """Return (stanzas, line_groups) where stanzas is list[list[str]] and line_groups maps indices."""
     stanza_texts = [s for s in re.split(r'\n\s*\n', text.strip()) if s.strip()]
-    return [[line for line in stanza_text.splitlines() if line.strip()] 
-            for stanza_text in stanza_texts]
+    
+    stanzas = []
+    all_line_groups = []  # List of line_groups for each stanza
+    
+    for stanza_text in stanza_texts:
+        lines = [line for line in stanza_text.splitlines() if line.strip()]
+        
+        if wrap_lines:
+            wrapped_lines, line_groups = wrap_long_lines(lines, max_line_length)
+            stanzas.append(wrapped_lines)
+            all_line_groups.append(line_groups)
+        else:
+            stanzas.append(lines)
+            # Create identity mapping for unwrapped lines
+            line_groups = {i: i for i in range(len(lines))}
+            all_line_groups.append(line_groups)
+    
+    return stanzas, all_line_groups
 
 
-def cloze_stanza(lines, blank_idx):
-    """Create a cloze deletion for the specified line in the stanza with preserved whitespace."""
+def cloze_stanza(lines, logical_line_idx, line_groups):
+    """Create a cloze deletion for the specified logical line, handling wrapped lines properly."""
     safe = lines.copy()
-    safe[blank_idx] = f'{{{{c1::{html.escape(safe[blank_idx])}}}}}'
+    
+    # Find all wrapped line indices that belong to this logical line
+    wrapped_indices = [i for i, orig_idx in line_groups.items() if orig_idx == logical_line_idx]
+    
+    # Apply cloze deletion to all parts of the wrapped line
+    for idx in wrapped_indices:
+        if idx < len(safe):
+            safe[idx] = f'{{{{c1::{html.escape(safe[idx])}}}}}'
+    
     return '<pre>' + '\n'.join(safe) + '</pre>'
 
 
-def build_notes(poem_txt, title=None, poet=None, shuffle_stanzas=True):
+def build_notes(poem_txt, title=None, poet=None, shuffle_stanzas=True, wrap_lines=True, max_line_length=65):
     """Build Anki notes from a poem text."""
     metadata, poem_content = parse_poem_with_metadata(poem_txt)
     
@@ -136,48 +160,63 @@ def build_notes(poem_txt, title=None, poet=None, shuffle_stanzas=True):
     poet = metadata.get('author', poet or 'Unknown Author')
     metadata_display = format_metadata_display(metadata, title, poet)
     
-    stanzas = parse_poem(poem_content)
+    stanzas, all_line_groups = parse_poem(poem_content, wrap_lines, max_line_length)
     notes = []
     
     if shuffle_stanzas:
-        max_lines = max(len(stanza) for stanza in stanzas) if stanzas else 0
+        # Find the maximum number of logical lines in any stanza
+        max_logical_lines = 0
+        for line_groups in all_line_groups:
+            if line_groups:
+                logical_line_count = max(line_groups.values()) + 1
+                max_logical_lines = max(max_logical_lines, logical_line_count)
         
-        for pass_num in range(max_lines):
-            for stanza_idx, stanza in enumerate(stanzas):
-                if stanza:  # Skip empty stanzas
-                    line_idx = random.randrange(len(stanza))
-                    line_info = f'Stanza {stanza_idx + 1}, Line {line_idx + 1}'
+        for pass_num in range(max_logical_lines):
+            for stanza_idx, (stanza, line_groups) in enumerate(zip(stanzas, all_line_groups)):
+                if stanza and line_groups:
+                    # Get unique logical line indices for this stanza
+                    logical_lines = sorted(set(line_groups.values()))
+                    
+                    # Only create a note if this pass is within the range of logical lines
+                    if pass_num < len(logical_lines):
+                        logical_line_idx = random.choice(logical_lines)
+                        
+                        line_info = f'Stanza {stanza_idx + 1}, Line {logical_line_idx + 1}'
+                        
+                        note = genanki.Note(
+                            model=CLOZE_MODEL,
+                            fields=[
+                                cloze_stanza(stanza, logical_line_idx, line_groups),
+                                line_info,
+                                title,
+                                poet,
+                                f'{line_info}<br>{metadata_display}'
+                            ],
+                            tags=[f"title:{slugify(title)}", f"author:{slugify(poet)}", f"pass:{pass_num + 1}"]
+                        )
+                        notes.append(note)
+            
+    else:
+        for stanza_idx, (stanza, line_groups) in enumerate(zip(stanzas, all_line_groups)):
+            if line_groups:
+                # Get unique logical line indices for this stanza
+                logical_lines = sorted(set(line_groups.values()))
+                
+                for logical_line_idx in logical_lines:
+                    line_info = f'Stanza {stanza_idx + 1}, Line {logical_line_idx + 1}'
                     
                     note = genanki.Note(
                         model=CLOZE_MODEL,
                         fields=[
-                            cloze_stanza(stanza, line_idx),
+                            cloze_stanza(stanza, logical_line_idx, line_groups),
                             line_info,
                             title,
                             poet,
-                            f'{metadata_display}<br>{line_info}'
+                            f'{line_info}<br>{metadata_display}'
                         ],
-                        tags=[f"title:{slugify(title)}", f"author:{slugify(poet)}", f"pass:{pass_num + 1}"]
+                        tags=[f"title:{slugify(title)}", f"author:{slugify(poet)}"]
                     )
                     notes.append(note)
-            
-    else:
-        for stanza_idx, stanza in enumerate(stanzas):
-            for line_idx in range(len(stanza)):
-                line_info = f'Stanza {stanza_idx + 1}, Line {line_idx + 1}'
-                
-                note = genanki.Note(
-                    model=CLOZE_MODEL,
-                    fields=[
-                        cloze_stanza(stanza, line_idx),
-                        line_info,
-                        title,
-                        poet,
-                        f'{metadata_display}<br>{line_info}'
-                    ],
-                    tags=[f"title:{slugify(title)}", f"author:{slugify(poet)}"]
-                )
-                notes.append(note)
     
     return notes
 
@@ -221,6 +260,51 @@ def send_to_ankiconnect(deck_name, notes):
             print("Make sure Anki is running with AnkiConnect add-on installed.")
             return False
     return True
+
+
+def wrap_long_lines(lines, max_length=65):
+    """Wrap long lines by breaking at word boundaries and indenting continuation lines.
+    Returns (wrapped_lines, line_groups) where line_groups maps wrapped line indices to original line indices.
+    """
+    wrapped_lines = []
+    line_groups = {}  # Maps wrapped line index to original line index
+    original_line_idx = 0
+    
+    for line in lines:
+        # Preserve existing indentation
+        leading_whitespace = len(line) - len(line.lstrip())
+        content = line.strip()
+        
+        if len(line) <= max_length:
+            line_groups[len(wrapped_lines)] = original_line_idx
+            wrapped_lines.append(line)
+        else:
+            # Split into words while preserving spaces
+            words = content.split()
+            if not words:
+                line_groups[len(wrapped_lines)] = original_line_idx
+                wrapped_lines.append(line)
+            else:
+                # Build wrapped lines - all parts belong to the same original line
+                current_line = ' ' * leading_whitespace + words[0]
+                
+                for word in words[1:]:
+                    # Check if adding this word would exceed the limit
+                    if len(current_line) + 1 + len(word) <= max_length:
+                        current_line += ' ' + word
+                    else:
+                        # Start new line with additional indentation (4 spaces)
+                        line_groups[len(wrapped_lines)] = original_line_idx
+                        wrapped_lines.append(current_line)
+                        current_line = ' ' * (leading_whitespace + 4) + word
+                
+                # Add the final line
+                line_groups[len(wrapped_lines)] = original_line_idx
+                wrapped_lines.append(current_line)
+        
+        original_line_idx += 1
+    
+    return wrapped_lines, line_groups
 
 
 def main():
@@ -270,6 +354,23 @@ def main():
         action="store_true",
         help="Put all poems in a single deck instead of individual subdecks"
     )
+    parser.add_argument(
+        "--wrap-lines",
+        action="store_true",
+        default=True,
+        help="Wrap long lines for better mobile/desktop display (default: True)"
+    )
+    parser.add_argument(
+        "--no-wrap",
+        action="store_true",
+        help="Disable line wrapping and keep original line lengths"
+    )
+    parser.add_argument(
+        "--max-line-length",
+        type=int,
+        default=65,
+        help="Maximum line length before wrapping (default: 65 characters)"
+    )
     
     args = parser.parse_args()
 
@@ -295,6 +396,10 @@ def main():
     
     # Handle deck organization flags
     use_individual_decks = args.individual_decks and not args.single_deck
+    
+    # Handle line wrapping flags
+    wrap_lines = args.wrap_lines and not args.no_wrap
+    max_line_length = args.max_line_length
 
     # Dictionary to store deck objects, keyed by deck name
     decks = {}
@@ -319,7 +424,7 @@ def main():
         if "::" in title:
             poet, title = map(str.strip, title.split("::", 1))
         
-        notes = build_notes(txt, title, poet, shuffle_stanzas)
+        notes = build_notes(txt, title, poet, shuffle_stanzas, wrap_lines, max_line_length)
         
         if notes:
             actual_title = notes[0].fields[2]

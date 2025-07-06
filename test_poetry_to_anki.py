@@ -13,7 +13,7 @@ Line 4
 
 Line 5"""
     
-    stanzas = parse_poem(sample_text)
+    stanzas, line_groups = parse_poem(sample_text, wrap_lines=False)
     assert len(stanzas) == 3, f"Expected 3 stanzas, got {len(stanzas)}"
     assert stanzas[0] == ["Line 1", "Line 2"]
     assert stanzas[1] == ["Line 3", "Line 4"] 
@@ -23,7 +23,9 @@ Line 5"""
 def test_cloze_stanza():
     """Test cloze deletion creation with preserved whitespace."""
     lines = ["First line", "Second line", "Third line"]
-    cloze = cloze_stanza(lines, 1)
+    # Create identity line groups for simple test case
+    line_groups = {0: 0, 1: 1, 2: 2}
+    cloze = cloze_stanza(lines, 1, line_groups)
     expected = "<pre>First line\n{{c1::Second line}}\nThird line</pre>"
     assert cloze == expected, f"Expected '{expected}', got '{cloze}'"
     print("✓ Cloze stanza test passed")
@@ -49,7 +51,7 @@ Line 4"""
     assert first_note.fields[2] == "Test Poem"        # Title
     assert first_note.fields[3] == "Test Author"      # Author
     # Metadata should contain the formatted display with line info
-    expected_metadata = '"Test Poem"<br>Test Author<br>Stanza 1, Line 1'
+    expected_metadata = 'Stanza 1, Line 1<br>"Test Poem"<br>Test Author'
     actual_metadata = first_note.fields[4]
     assert actual_metadata == expected_metadata, f"Expected '{expected_metadata}', got '{actual_metadata}'"
     
@@ -340,10 +342,10 @@ Line 5"""
     # Test with new shuffling behavior (default)
     notes = build_notes(poem_text, "Test Poem", "Test Author", shuffle_stanzas=True)
     
-    # Should have max_lines × num_stanzas notes
     # Stanza 1: 3 lines, Stanza 2: 2 lines → max_lines = 3
-    # So we expect 3 review passes × 2 stanzas = 6 notes
-    assert len(notes) == 6, f"Expected 6 notes (3 passes × 2 stanzas), got {len(notes)}"
+    # Pass 1: 2 notes (both stanzas), Pass 2: 2 notes (both stanzas), Pass 3: 1 note (only stanza 1)
+    # So we expect 5 notes total
+    assert len(notes) == 5, f"Expected 5 notes (2+2+1), got {len(notes)}"
     
     # Check that we have the right number of notes for each pass
     pass1_notes = [n for n in notes if "pass:1" in n.tags]
@@ -352,14 +354,14 @@ Line 5"""
     
     assert len(pass1_notes) == 2, f"Expected 2 notes in pass 1, got {len(pass1_notes)}"
     assert len(pass2_notes) == 2, f"Expected 2 notes in pass 2, got {len(pass2_notes)}"
-    assert len(pass3_notes) == 2, f"Expected 2 notes in pass 3, got {len(pass3_notes)}"
+    assert len(pass3_notes) == 1, f"Expected 1 note in pass 3, got {len(pass3_notes)}"
     
     # Check that stanza numbers are preserved (should be "Stanza 1, Line X" and "Stanza 2, Line Y")
     stanza1_notes = [n for n in notes if n.fields[1].startswith("Stanza 1,")]
     stanza2_notes = [n for n in notes if n.fields[1].startswith("Stanza 2,")]
     
     assert len(stanza1_notes) == 3, f"Expected 3 notes for stanza 1, got {len(stanza1_notes)}"
-    assert len(stanza2_notes) == 3, f"Expected 3 notes for stanza 2, got {len(stanza2_notes)}"
+    assert len(stanza2_notes) == 2, f"Expected 2 notes for stanza 2, got {len(stanza2_notes)}"
     
     # Check that each note contains the full stanza with one line cloze-deleted
     for note in stanza1_notes:
@@ -439,8 +441,9 @@ Second line of stanza two"""
     notes = build_notes(poem_text, shuffle_stanzas=True)
     
     # With shuffling, we should get multiple passes through the poem
-    # Max stanza length is 3, so we should get 3 × 2 stanzas = 6 notes
-    assert len(notes) == 6, f"Expected 6 notes with shuffling, got {len(notes)}"
+    # Stanza 1: 3 lines, Stanza 2: 2 lines → max_lines = 3
+    # Pass 1: 2 notes, Pass 2: 2 notes, Pass 3: 1 note = 5 total
+    assert len(notes) == 5, f"Expected 5 notes with shuffling, got {len(notes)}"
     
     # Available lines by stanza
     stanza_lines = {
@@ -592,7 +595,41 @@ Back to normal"""
     
     print("✓ Whitespace preservation test passed")
 
+def test_line_wrapping():
+    """Test long line wrapping functionality."""
+    from poetry_to_anki import wrap_long_lines
+    
+    # Test basic wrapping
+    long_lines = [
+        "This is a very long line that should be wrapped when it exceeds the maximum length",
+        "Short line",
+        "  Indented very long line that should also be wrapped but preserve the initial indentation"
+    ]
+    
+    wrapped, line_groups = wrap_long_lines(long_lines, max_length=40)
+    
+    # Check that long lines are wrapped into multiple lines
+    assert len(wrapped) > len(long_lines), "Long lines should be wrapped into multiple lines"
+    
+    # Check that short lines are preserved
+    assert "Short line" in wrapped, "Short lines should be preserved"
+    
+    # Check that line groups correctly map wrapped lines to original lines
+    assert len(line_groups) == len(wrapped), "Line groups should map all wrapped lines"
+    
+    # Check that the first long line (index 0) has multiple wrapped parts
+    first_line_parts = [i for i, orig_idx in line_groups.items() if orig_idx == 0]
+    assert len(first_line_parts) > 1, "First long line should be wrapped into multiple parts"
+    
+    # Check indentation preservation
+    indented_lines = [line for line in wrapped if line.startswith("  ")]
+    assert len(indented_lines) >= 1, "Indented lines should preserve indentation"
+    
+    print("✓ Line wrapping test passed")
+
+
 if __name__ == "__main__":
+    test_line_wrapping()
     test_parse_poem()
     test_cloze_stanza()
     test_build_notes()
@@ -608,4 +645,5 @@ if __name__ == "__main__":
     test_metadata_line_accuracy_with_shuffling()
     test_add_new_poem_functions()
     test_whitespace_preservation()
+    test_line_wrapping()
     print("\n✅ All tests passed!")

@@ -6,7 +6,6 @@ This script prompts for metadata, creates a properly formatted .md file
 in the poems/ directory, and opens it in the user's default text editor.
 """
 
-import os
 import sys
 import subprocess
 import platform
@@ -14,8 +13,8 @@ from pathlib import Path
 from slugify import slugify
 
 
-def get_user_input(prompt, required=True, default=None):
-    """Get user input with optional default value."""
+def get_validated_input(prompt, validator=None, required=True, default=None):
+    """Get user input with optional validation."""
     if default:
         prompt += f" (default: {default})"
     prompt += ": "
@@ -23,14 +22,22 @@ def get_user_input(prompt, required=True, default=None):
     while True:
         value = input(prompt).strip()
         
-        if value:
-            return value
-        elif default:
-            return default
-        elif not required:
-            return None
+        if not value:
+            if default:
+                return default
+            elif not required:
+                return None
+            else:
+                print("This field is required. Please enter a value.")
+                continue
+        
+        if validator:
+            result = validator(value)
+            if result is not None:
+                return result
+            # validator prints its own error message
         else:
-            print("This field is required. Please enter a value.")
+            return value
 
 
 def validate_year(year_str):
@@ -62,7 +69,30 @@ def validate_url(url_str):
         return None
 
 
+def create_yaml_frontmatter(title, author, collection=None, year=None, url=None):
+    """Create YAML frontmatter content."""
+    content = ["---", f'title: "{title}"', f'author: "{author}"']
+    
+    if collection:
+        content.append(f'collection: "{collection}"')
+    if year:
+        content.append(f'year: {year}')
+    if url:
+        content.append(f'url: "{url}"')
+    
+    content.extend(["---", "", "Delete this line and paste your poem here.", ""])
+    return '\n'.join(content)
+
+
 def create_filename(title, author):
+    """Create a safe filename from title and author."""
+    base_name = slugify(title, max_length=50)
+    
+    if len(base_name) < 10 or base_name in ['poem', 'sonnet', 'ode', 'song']:
+        author_slug = slugify(author, max_length=20)
+        base_name = f"{author_slug}_{base_name}"
+    
+    return f"{base_name}.md"
     """Create a safe filename from title and author."""
     # Use title as primary identifier
     base_name = slugify(title, max_length=50)
@@ -83,19 +113,18 @@ def open_file_in_editor(file_path):
         if system == "Darwin":  # macOS
             subprocess.run(["open", file_path], check=True)
         elif system == "Windows":
-            os.startfile(file_path)
-        elif system == "Linux":
-            # Try common Linux editors
+            import os
+            os.startfile(file_path)  # type: ignore
+        else:  # Linux and others
             editors = ["xdg-open", "gedit", "kate", "nano", "vim"]
             for editor in editors:
                 try:
                     subprocess.run([editor, file_path], check=True)
-                    break
+                    return True
                 except (subprocess.CalledProcessError, FileNotFoundError):
                     continue
-            else:
-                print(f"Could not open editor. Please manually edit: {file_path}")
-                return False
+            print(f"Could not open editor. Please manually edit: {file_path}")
+            return False
         
         return True
         
@@ -106,113 +135,49 @@ def open_file_in_editor(file_path):
 
 
 def main():
-    print("=" * 60)
     print("Poetry to Anki - Add New Poem")
-    print("=" * 60)
-    print()
-    print("This script will help you add a new poem to your collection.")
-    print("It will create a properly formatted .md file and open it for editing.")
-    print()
+    print("=" * 40)
     
-    # Ensure poems directory exists
     poems_dir = Path("poems")
     poems_dir.mkdir(exist_ok=True)
     
-    # Collect metadata
-    print("Please enter the poem information:")
-    print("(Required fields are marked with *)")
-    print()
+    print("Enter poem information (* = required):")
     
-    title = get_user_input("* Poem title", required=True)
-    author = get_user_input("* Author name", required=True)
+    title = get_validated_input("* Poem title", required=True)
+    author = get_validated_input("* Author name", required=True)
+    collection = get_validated_input("Collection/Book name", required=False)
+    year = get_validated_input("Publication year", validator=validate_year, required=False)
+    url = get_validated_input("Source URL", validator=validate_url, required=False)
     
-    # Optional fields
-    collection = get_user_input("Collection/Book name", required=False)
-    
-    # Year with validation
-    while True:
-        year_input = get_user_input("Publication year", required=False)
-        if not year_input:
-            year = None
-            break
-        year = validate_year(year_input)
-        if year is not None:
-            break
-    
-    # URL with validation
-    while True:
-        url_input = get_user_input("Source URL", required=False)
-        if not url_input:
-            url = None
-            break
-        url = validate_url(url_input)
-        if url is not None:
-            break
-    
-    # Create filename
+    # Create and write file
     filename = create_filename(title, author)
     file_path = poems_dir / filename
     
-    # Check if file already exists
     if file_path.exists():
-        print(f"\nWarning: File '{filename}' already exists!")
-        overwrite = input("Do you want to overwrite it? (y/N): ").strip().lower()
+        overwrite = input(f"\nFile '{filename}' exists. Overwrite? (y/N): ").strip().lower()
         if overwrite not in ['y', 'yes']:
             print("Operation cancelled.")
-            return
+            return 1
     
-    # Create YAML frontmatter
-    frontmatter_lines = ["---"]
-    frontmatter_lines.append(f'title: "{title}"')
-    frontmatter_lines.append(f'author: "{author}"')
-    
-    if collection:
-        frontmatter_lines.append(f'collection: "{collection}"')
-    
-    if year:
-        frontmatter_lines.append(f'year: {year}')
-    
-    if url:
-        frontmatter_lines.append(f'url: "{url}"')
-    
-    frontmatter_lines.append("---")
-    frontmatter_lines.append("")  # Empty line after frontmatter
-    frontmatter_lines.append("Delete this line and paste your poem here.")
-    frontmatter_lines.append("")
-    
-    # Write the file
     try:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(frontmatter_lines))
+        file_path.write_text(create_yaml_frontmatter(title, author, collection, year, url), encoding='utf-8')
         
-        print(f"\n✓ Created file: {file_path}")
-        print(f"✓ Metadata added with title: {title}")
-        print(f"✓ Author: {author}")
-        
+        print(f"\n✓ Created: {file_path}")
+        metadata_parts = [f"Title: {title}", f"Author: {author}"]
         if collection:
-            print(f"✓ Collection: {collection}")
+            metadata_parts.append(f"Collection: {collection}")
         if year:
-            print(f"✓ Year: {year}")
+            metadata_parts.append(f"Year: {year}")
         if url:
-            print(f"✓ Source URL: {url}")
+            metadata_parts.append(f"Source: {url}")
+        print("✓ " + " | ".join(metadata_parts))
         
-        print("\nOpening file in your default text editor...")
-        print("Please add the poem text and save the file.")
-        print()
-        
-        # Open in editor
         if open_file_in_editor(str(file_path)):
-            print("✓ File opened in editor")
-        
-        print("\nNext steps:")
-        print("1. Add your poem text to the file (replace the comments)")
-        print("2. Save and close the file")
-        print("3. Run 'python poetry_to_anki.py' to generate Anki cards")
-        print()
-        print("The poem will be automatically included in your deck!")
+            print("✓ Opened in editor")
+            print("\nNext: Add poem text, save, then run 'python poetry_to_anki.py'")
         
     except Exception as e:
-        print(f"Error creating file: {e}")
+        print(f"Error: {e}")
         return 1
     
     return 0
