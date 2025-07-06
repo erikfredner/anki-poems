@@ -88,7 +88,7 @@ class Config:
     shuffle_stanzas: bool = True
     individual_decks: bool = True
     wrap_lines: bool = True
-    max_line_length: int = 65
+    max_line_length: int = 50
     
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -185,7 +185,7 @@ class PoemParser:
         return {}, text.strip()
     
     @staticmethod
-    def parse_stanzas(text: str, wrap_lines: bool = True, max_line_length: int = 65) -> List[Stanza]:
+    def parse_stanzas(text: str, wrap_lines: bool = True, max_line_length: int = 50) -> List[Stanza]:
         """Parse poem text into stanzas with line wrapping support."""
         stanza_texts = [s for s in re.split(r'\n\s*\n', text.strip()) if s.strip()]
         
@@ -208,7 +208,7 @@ class LineWrapper:
     """Handles line wrapping functionality."""
     
     @staticmethod
-    def wrap_long_lines(lines: List[str], max_length: int = 65) -> Tuple[List[str], Dict[int, int]]:
+    def wrap_long_lines(lines: List[str], max_length: int = 50) -> Tuple[List[str], Dict[int, int]]:
         """
         Wrap long lines by breaking at word boundaries and indenting continuation lines.
         
@@ -620,7 +620,7 @@ def format_metadata_display(metadata: Dict[str, str], title: Optional[str] = Non
     """Backward compatibility wrapper."""
     return MetadataFormatter.format_display(metadata, title, author)
 
-def parse_poem(text: str, wrap_lines: bool = True, max_line_length: int = 65) -> Tuple[List[List[str]], List[Dict[int, int]]]:
+def parse_poem(text: str, wrap_lines: bool = True, max_line_length: int = 50) -> Tuple[List[List[str]], List[Dict[int, int]]]:
     """Backward compatibility wrapper."""
     stanzas = PoemParser.parse_stanzas(text, wrap_lines, max_line_length)
     return [stanza.lines for stanza in stanzas], [stanza.line_groups for stanza in stanzas]
@@ -630,7 +630,7 @@ def cloze_stanza(lines: List[str], logical_line_idx: int, line_groups: Dict[int,
     return ClozeGenerator.create_cloze_stanza(lines, logical_line_idx, line_groups)
 
 def build_notes(poem_txt: str, title: Optional[str] = None, poet: Optional[str] = None, 
-               shuffle_stanzas: bool = True, wrap_lines: bool = True, max_line_length: int = 65) -> List[genanki.Note]:
+               shuffle_stanzas: bool = True, wrap_lines: bool = True, max_line_length: int = 50) -> List[genanki.Note]:
     """Backward compatibility wrapper."""
     note_builder = NoteBuilder(CLOZE_MODEL)
     config = Config(
@@ -640,7 +640,7 @@ def build_notes(poem_txt: str, title: Optional[str] = None, poet: Optional[str] 
     )
     return note_builder.build_notes(poem_txt, title, poet, config)
 
-def wrap_long_lines(lines: List[str], max_length: int = 65) -> Tuple[List[str], Dict[int, int]]:
+def wrap_long_lines(lines: List[str], max_length: int = 50) -> Tuple[List[str], Dict[int, int]]:
     """Backward compatibility wrapper."""
     return LineWrapper.wrap_long_lines(lines, max_length)
 
@@ -732,8 +732,8 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-line-length",
         type=int,
-        default=65,
-        help="Maximum line length before wrapping (default: 65 characters)"
+        default=50,
+        help="Maximum line length before wrapping (default: 50 characters)"
     )
     return parser
 
