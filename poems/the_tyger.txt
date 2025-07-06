@@ -3,6 +3,7 @@ title: "The Tyger"
 author: "William Blake"
 collection: "Songs of Experience"
 year: 1794
+url: "https://www.poetryfoundation.org/poems/43687/the-tyger"
 ---
 
 Tyger Tyger, burning bright,

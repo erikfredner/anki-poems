@@ -153,7 +153,34 @@ def test_metadata_formatting():
     display = format_metadata_display(metadata)
     expected = '"Test Poem" by Test Author from <i>Test Collection</i> (1999)'
     assert display == expected, f"Expected '{expected}', got '{display}'"
+    
+    # Test with URL
+    metadata_with_url = {
+        'title': 'Test Poem',
+        'author': 'Test Author',
+        'collection': 'Test Collection',
+        'year': 1999,
+        'url': 'https://example.com/poem'
+    }
+    
+    display_with_url = format_metadata_display(metadata_with_url)
+    expected_with_url = '"Test Poem" by Test Author from <i>Test Collection</i> (1999)<br><small>Source: <a href="https://example.com/poem" target="_blank">https://example.com/poem</a></small>'
+    assert display_with_url == expected_with_url, f"Expected '{expected_with_url}', got '{display_with_url}'"
+    
     print("✓ Metadata formatting test passed")
+
+def test_url_only_metadata():
+    """Test metadata formatting with only URL."""
+    metadata_url_only = {
+        'title': 'Simple Poem',
+        'author': 'Simple Author',
+        'url': 'https://poems.example.com/simple'
+    }
+    
+    display = format_metadata_display(metadata_url_only)
+    expected = '"Simple Poem" by Simple Author<br><small>Source: <a href="https://poems.example.com/simple" target="_blank">https://poems.example.com/simple</a></small>'
+    assert display == expected, f"Expected '{expected}', got '{display}'"
+    print("✓ URL-only metadata test passed")
 
 if __name__ == "__main__":
     test_parse_poem()
@@ -163,4 +190,5 @@ if __name__ == "__main__":
     test_transition_notes()
     test_yaml_parsing()
     test_metadata_formatting()
+    test_url_only_metadata()
     print("\n🎉 All tests passed!")

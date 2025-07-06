@@ -129,6 +129,7 @@ def format_metadata_display(metadata, title=None, author=None):
     author = metadata.get('author', author or 'Unknown Author')
     collection = metadata.get('collection')
     year = metadata.get('year')
+    url = metadata.get('url')
     
     # Base format: "Title" by Author
     display = f'"{title}" by {author}'
@@ -140,6 +141,10 @@ def format_metadata_display(metadata, title=None, author=None):
         display += f' from <i>{collection}</i>'
     elif year:
         display += f' ({year})'
+    
+    # Add URL source if available
+    if url:
+        display += f'<br><small>Source: <a href="{url}" target="_blank">{url}</a></small>'
     
     return display
 

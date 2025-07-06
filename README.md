@@ -37,10 +37,19 @@ title: "The Tyger"
 author: "William Blake"
 collection: "Songs of Experience"
 year: 1794
+url: "https://www.poetryfoundation.org/poems/43687/the-tyger"
 ---
 
 Your poem content here...
 ```
+
+**Available fields:**
+
+- `title`: Poem title (required)
+- `author`: Poet's name (required)  
+- `collection`: Book/collection name (optional)
+- `year`: Publication year (optional)
+- `url`: Source URL (optional, displays as clickable link)
 
 ### Filename-based (Fallback)
 
@@ -69,7 +78,8 @@ The generated cards use a clean, poetry-friendly format:
 
 ## Features
 
-- **Rich Metadata**: YAML frontmatter support for title, author, collection, and year
+- **Rich Metadata**: YAML frontmatter support for title, author, collection, year, and source URL
+- **Source Tracking**: URLs display as clickable links on cards for easy reference
 - **Beautiful Formatting**: Cards display as `"Title" by Author from <i>Collection</i> (Year)`
 - **Two Card Types**: Line cloze cards + transition cards between stanzas
 - **Transition Cards**: Help memorize the flow between stanzas (can be disabled with `--no-transitions`)

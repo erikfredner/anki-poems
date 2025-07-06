@@ -3,6 +3,7 @@ title: "Ozymandias"
 author: "Percy Bysshe Shelley"
 collection: "Miscellaneous Poems"
 year: 1818
+url: "https://www.poetryfoundation.org/poems/46565/ozymandias"
 ---
 
 I met a traveller from an antique land,
