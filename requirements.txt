@@ -1,4 +1,0 @@
-genanki>=0.13.1
-python-slugify>=8.0.4
-requests>=2.32.4
-pyyaml>=6.0
