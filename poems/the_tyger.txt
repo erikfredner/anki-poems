@@ -1,4 +1,9 @@
-William Blake::The Tyger
+---
+title: "The Tyger"
+author: "William Blake"
+collection: "Songs of Experience"
+year: 1794
+---
 
 Tyger Tyger, burning bright,
 In the forests of the night;

@@ -22,12 +22,29 @@ python poetry_to_anki.py -f poems/*.txt --mode ankiconnect
 python poetry_to_anki.py -f poems/sonnet.txt poems/ode.txt --mode apkg
 ```
 
-## File Naming
+## File Format
 
-Place `.txt` files in the `poems/` directory using either:
+Place `.txt` files in the `poems/` directory. You can use either:
+
+### YAML Frontmatter (Recommended)
+
+```yaml
+---
+title: "The Tyger"
+author: "William Blake"
+collection: "Songs of Experience"
+year: 1794
+---
+
+Your poem content here...
+```
+
+### Filename-based (Fallback)
 
 - `title.txt` (author will be "Unknown")
 - `Author Name::Title.txt` (author and title parsed from filename)
+
+**Note**: YAML frontmatter takes precedence over filename parsing when both are present.
 
 ## Card Format
 
@@ -40,10 +57,12 @@ The generated cards use a clean, poetry-friendly format:
 
 ## Features
 
+- **Rich Metadata**: YAML frontmatter support for title, author, collection, and year
+- **Beautiful Formatting**: Cards display as `"Title" by Author from <i>Collection</i> (Year)`
 - Each stanza becomes multiple cloze cards (one per line)
 - **Preserved formatting**: Line breaks are maintained in the card display
 - **Clean answers**: Only the cloze deletion is revealed, not the entire stanza
-- **Proper metadata**: Cards display the correct poem title and author
+- **Proper metadata**: Cards display the correct poem title and author with collection info
 - Notes are tagged with `title:slug` and `author:slug` for easy filtering
 - Support for both .apkg export and live AnkiConnect integration
 - Stable IDs prevent duplicate cards on re-import

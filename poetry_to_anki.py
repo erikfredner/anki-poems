@@ -12,6 +12,7 @@ from pathlib import Path
 from slugify import slugify
 import genanki
 import requests
+import yaml
 
 # Stable IDs (generated once, never change to avoid duplicates)
 DECK_ID = 1503075733
@@ -26,6 +27,7 @@ CLOZE_MODEL = genanki.Model(
         {'name': 'LineNo'},
         {'name': 'Title'},
         {'name': 'Author'},
+        {'name': 'Metadata'},
     ],
     templates=[
         {
@@ -35,7 +37,7 @@ CLOZE_MODEL = genanki.Model(
 </div>
 <hr>
 <div style="text-align: center; color: #666; font-size: 14px;">
-<strong>{{Title}}</strong> by {{Author}}<br>
+{{Metadata}}<br>
 <small>Stanza {{LineNo}}</small>
 </div>''',
             'afmt': '''<div style="font-family: serif; font-size: 18px; line-height: 1.6; text-align: center;">
@@ -43,13 +45,56 @@ CLOZE_MODEL = genanki.Model(
 </div>
 <hr>
 <div style="text-align: center; color: #666; font-size: 14px;">
-<strong>{{Title}}</strong> by {{Author}}<br>
+{{Metadata}}<br>
 <small>Stanza {{LineNo}}</small>
 </div>''',
         },
     ],
     model_type=genanki.Model.CLOZE,
 )
+
+
+def parse_poem_with_metadata(text: str):
+    """Parse a poem with YAML frontmatter, returning metadata and poem text."""
+    # Check if the file starts with YAML frontmatter
+    if text.strip().startswith('---'):
+        parts = text.split('---', 2)
+        if len(parts) >= 3:
+            # Extract YAML frontmatter and poem content
+            yaml_content = parts[1].strip()
+            poem_content = parts[2].strip()
+            
+            try:
+                metadata = yaml.safe_load(yaml_content)
+            except yaml.YAMLError:
+                # Fallback to empty metadata if YAML parsing fails
+                metadata = {}
+            
+            return metadata, poem_content
+    
+    # No YAML frontmatter, return empty metadata and full text
+    return {}, text.strip()
+
+
+def format_metadata_display(metadata, title=None, author=None):
+    """Format metadata for display on cards."""
+    title = metadata.get('title', title or 'Unknown Title')
+    author = metadata.get('author', author or 'Unknown Author')
+    collection = metadata.get('collection')
+    year = metadata.get('year')
+    
+    # Base format: "Title" by Author
+    display = f'"{title}" by {author}'
+    
+    # Add collection and year if available
+    if collection and year:
+        display += f' from <i>{collection}</i> ({year})'
+    elif collection:
+        display += f' from <i>{collection}</i>'
+    elif year:
+        display += f' ({year})'
+    
+    return display
 
 
 def parse_poem(text: str):
@@ -67,9 +112,19 @@ def cloze_stanza(lines, blank_idx):
     return '<br>'.join(safe)
 
 
-def build_notes(poem_txt, title, poet):
+def build_notes(poem_txt, title=None, poet=None):
     """Build Anki notes from a poem text."""
-    stanzas = parse_poem(poem_txt)
+    # Parse metadata and poem content
+    metadata, poem_content = parse_poem_with_metadata(poem_txt)
+    
+    # Use metadata if available, otherwise fall back to parameters
+    title = metadata.get('title', title or 'Unknown Title')
+    poet = metadata.get('author', poet or 'Unknown Author')
+    
+    # Format the metadata display
+    metadata_display = format_metadata_display(metadata, title, poet)
+    
+    stanzas = parse_poem(poem_content)
     notes = []
     
     for s_idx, stanza in enumerate(stanzas, 1):
@@ -78,7 +133,8 @@ def build_notes(poem_txt, title, poet):
                 cloze_stanza(stanza, l_idx),      # Text (cloze with <br> formatting)
                 f'{s_idx}.{l_idx+1}',             # LineNo
                 title,                            # Title
-                poet                              # Author
+                poet,                             # Author
+                metadata_display                  # Metadata (formatted display)
             ]
             note = genanki.Note(
                 model=CLOZE_MODEL,
@@ -104,6 +160,7 @@ def send_to_ankiconnect(deck_name, notes):
                         "LineNo": note.fields[1],
                         "Title": note.fields[2],
                         "Author": note.fields[3],
+                        "Metadata": note.fields[4],
                     },
                     "tags": note.tags
                 }
@@ -168,21 +225,28 @@ def main():
             print(f"Warning: Could not read {file_path} as UTF-8, skipping...")
             continue
         
-        # Parse title and author from filename
+        # Parse title and author from filename as fallback
         title = path.stem.replace('_', ' ').title()
         poet = "Unknown"
         
-        # Support "poet::title.txt" naming scheme
+        # Support "poet::title.txt" naming scheme as fallback
         if "::" in title:
             poet, title = map(str.strip, title.split("::", 1))
         
-        # Build notes for this poem
+        # Build notes for this poem (will use YAML metadata if available)
         notes = build_notes(txt, title, poet)
         for note in notes:
             deck.add_note(note)
         
+        # Get the actual title and author used (from metadata or fallback)
+        if notes:
+            actual_title = notes[0].fields[2]  # Title field
+            actual_poet = notes[0].fields[3]   # Author field
+        else:
+            actual_title, actual_poet = title, poet
+        
         total_notes += len(notes)
-        print(f"Processed '{title}' by {poet}: {len(notes)} notes")
+        print(f"Processed '{actual_title}' by {actual_poet}: {len(notes)} notes")
 
     print(f"\nTotal notes created: {total_notes}")
     

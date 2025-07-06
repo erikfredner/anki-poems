@@ -1,3 +1,10 @@
+---
+title: "Sonnet 18"
+author: "William Shakespeare"
+collection: "Sonnets"
+year: 1609
+---
+
 Shall I compare thee to a summer's day?
 Thou art more lovely and more temperate:
 Rough winds do shake the darling buds of May,
