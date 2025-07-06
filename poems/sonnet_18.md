@@ -3,6 +3,7 @@ title: "Sonnet 18"
 author: "William Shakespeare"
 collection: "Sonnets"
 year: 1609
+url: "https://www.poetryfoundation.org/poems/45087/sonnet-18-shall-i-compare-thee-to-a-summers-day"
 ---
 
 Shall I compare thee to a summer's day?

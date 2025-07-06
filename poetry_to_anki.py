@@ -129,7 +129,8 @@ def format_metadata_display(metadata, title=None, author=None):
     author = metadata.get('author', author or 'Unknown Author')
     collection = metadata.get('collection')
     year = metadata.get('year')
-    url = metadata.get('url')
+    # Support both 'url' and 'source' fields for flexibility
+    url = metadata.get('url') or metadata.get('source')
     
     # Base format: "Title" by Author
     display = f'"{title}" by {author}'
@@ -311,7 +312,7 @@ def main():
         "-f", "--files", 
         nargs="+", 
         required=True, 
-        help="Poem text files to process"
+        help="Poem markdown files to process"
     )
     parser.add_argument(
         "--mode", 

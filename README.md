@@ -13,21 +13,21 @@ source .venv/bin/activate
 
 ```bash
 # Create an .apkg file from all poems in the poems/ directory
-python poetry_to_anki.py -f poems/*.txt --mode apkg
+python poetry_to_anki.py -f poems/*.md --mode apkg
 
 # Send directly to a running Anki instance (requires AnkiConnect)
-python poetry_to_anki.py -f poems/*.txt --mode ankiconnect
+python poetry_to_anki.py -f poems/*.md --mode ankiconnect
 
 # Process specific files
-python poetry_to_anki.py -f poems/sonnet.txt poems/ode.txt --mode apkg
+python poetry_to_anki.py -f poems/sonnet.md poems/ode.md --mode apkg
 
 # Disable transition cards between stanzas
-python poetry_to_anki.py -f poems/*.txt --mode apkg --no-transitions
+python poetry_to_anki.py -f poems/*.md --mode apkg --no-transitions
 ```
 
 ## File Format
 
-Place `.txt` files in the `poems/` directory. You can use either:
+Place `.md` files in the `poems/` directory. You can use either:
 
 ### YAML Frontmatter (Recommended)
 
@@ -49,12 +49,12 @@ Your poem content here...
 - `author`: Poet's name (required)  
 - `collection`: Book/collection name (optional)
 - `year`: Publication year (optional)
-- `url`: Source URL (optional, displays as clickable link)
+- `url` or `source`: Source URL (optional, displays as clickable link)
 
 ### Filename-based (Fallback)
 
-- `title.txt` (author will be "Unknown")
-- `Author Name::Title.txt` (author and title parsed from filename)
+- `title.md` (author will be "Unknown")
+- `Author Name::Title.md` (author and title parsed from filename)
 
 **Note**: YAML frontmatter takes precedence over filename parsing when both are present.
 

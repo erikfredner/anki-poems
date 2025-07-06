@@ -180,6 +180,18 @@ def test_url_only_metadata():
     display = format_metadata_display(metadata_url_only)
     expected = '"Simple Poem" by Simple Author<br><small>Source: <a href="https://poems.example.com/simple" target="_blank">https://poems.example.com/simple</a></small>'
     assert display == expected, f"Expected '{expected}', got '{display}'"
+    
+    # Test with 'source' field instead of 'url'
+    metadata_source_only = {
+        'title': 'Another Poem',
+        'author': 'Another Author',
+        'source': 'https://manuscripts.example.com/poem'
+    }
+    
+    display_source = format_metadata_display(metadata_source_only)
+    expected_source = '"Another Poem" by Another Author<br><small>Source: <a href="https://manuscripts.example.com/poem" target="_blank">https://manuscripts.example.com/poem</a></small>'
+    assert display_source == expected_source, f"Expected '{expected_source}', got '{display_source}'"
+    
     print("✓ URL-only metadata test passed")
 
 if __name__ == "__main__":
