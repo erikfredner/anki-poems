@@ -90,14 +90,18 @@ class Config:
     wrap_lines: bool = True
     max_line_length: int = 65
     
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         self.validate()
     
     def validate(self) -> None:
         """Validate configuration parameters."""
-        if self.mode not in ["apkg", "ankiconnect"]:
-            raise ConfigurationError(f"Invalid mode: {self.mode}. Must be 'apkg' or 'ankiconnect'")
+        # Constants for validation
+        VALID_MODES = ["apkg", "ankiconnect"]
+        MIN_LINE_LENGTH = 10
+        
+        if self.mode not in VALID_MODES:
+            raise ConfigurationError(f"Invalid mode: {self.mode}. Must be one of {VALID_MODES}")
         
         if not self.deck_name.strip():
             raise ConfigurationError("Deck name cannot be empty")
@@ -105,8 +109,8 @@ class Config:
         if self.mode == "apkg" and not self.output.strip():
             raise ConfigurationError("Output filename cannot be empty in apkg mode")
         
-        if self.max_line_length < 10:
-            raise ConfigurationError("Maximum line length must be at least 10 characters")
+        if self.max_line_length < MIN_LINE_LENGTH:
+            raise ConfigurationError(f"Maximum line length must be at least {MIN_LINE_LENGTH} characters")
         
         if self.files:
             for file_path in self.files:
@@ -167,7 +171,7 @@ class PoemParser:
     """Handles parsing of poem text and metadata."""
     
     @staticmethod
-    def parse_metadata(text: str) -> Tuple[Dict, str]:
+    def parse_metadata(text: str) -> Tuple[Dict[str, str], str]:
         """Parse a poem with YAML frontmatter, returning metadata and poem text."""
         if text.strip().startswith('---'):
             parts = text.split('---', 2)
@@ -205,7 +209,17 @@ class LineWrapper:
     
     @staticmethod
     def wrap_long_lines(lines: List[str], max_length: int = 65) -> Tuple[List[str], Dict[int, int]]:
-        """Wrap long lines by breaking at word boundaries and indenting continuation lines."""
+        """
+        Wrap long lines by breaking at word boundaries and indenting continuation lines.
+        
+        Args:
+            lines: List of original lines to wrap
+            max_length: Maximum characters per line before wrapping
+            
+        Returns:
+            Tuple of (wrapped_lines, line_groups) where line_groups maps 
+            wrapped line indices to their original logical line indices
+        """
         wrapped_lines = []
         line_groups = {}  # Maps wrapped line index to original line index
         original_line_idx = 0
@@ -251,7 +265,7 @@ class MetadataFormatter:
     """Handles formatting of metadata for display."""
     
     @staticmethod
-    def format_display(metadata: Dict, title: Optional[str] = None, author: Optional[str] = None) -> str:
+    def format_display(metadata: Dict[str, str], title: Optional[str] = None, author: Optional[str] = None) -> str:
         """Format metadata for display on cards."""
         title = metadata.get('title', title or 'Unknown Title')
         author = metadata.get('author', author or 'Unknown Author')
@@ -296,7 +310,7 @@ class ClozeGenerator:
 class NoteBuilder:
     """Builds Anki notes from poems."""
     
-    def __init__(self, model: genanki.Model):
+    def __init__(self, model: genanki.Model) -> None:
         self.model = model
     
     def build_notes(self, poem_txt: str, title: Optional[str] = None, poet: Optional[str] = None, 
@@ -477,9 +491,9 @@ class FileHandler:
 class DeckManager:
     """Manages Anki deck creation and organization."""
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         self.config = config
-        self.decks = {}
+        self.decks: Dict[str, genanki.Deck] = {}
         
     def create_deck_name(self, title: str, author: str, title_counts: Dict[str, int]) -> str:
         """Create a deck name based on configuration and title collisions."""
@@ -507,7 +521,7 @@ class DeckManager:
 class PoetryToAnkiProcessor:
     """Main processor class that orchestrates the conversion."""
     
-    def __init__(self, config: Config):
+    def __init__(self, config: Config) -> None:
         self.config = config
         self.model = AnkiModelFactory.create_cloze_model()
         self.note_builder = NoteBuilder(self.model)
@@ -598,24 +612,25 @@ class PoetryToAnkiProcessor:
 
 
 # Backward compatibility functions for tests
-def parse_poem_with_metadata(text: str):
+def parse_poem_with_metadata(text: str) -> Tuple[Dict[str, str], str]:
     """Backward compatibility wrapper."""
     return PoemParser.parse_metadata(text)
 
-def format_metadata_display(metadata, title=None, author=None):
+def format_metadata_display(metadata: Dict[str, str], title: Optional[str] = None, author: Optional[str] = None) -> str:
     """Backward compatibility wrapper."""
     return MetadataFormatter.format_display(metadata, title, author)
 
-def parse_poem(text: str, wrap_lines=True, max_line_length=65):
+def parse_poem(text: str, wrap_lines: bool = True, max_line_length: int = 65) -> Tuple[List[List[str]], List[Dict[int, int]]]:
     """Backward compatibility wrapper."""
     stanzas = PoemParser.parse_stanzas(text, wrap_lines, max_line_length)
     return [stanza.lines for stanza in stanzas], [stanza.line_groups for stanza in stanzas]
 
-def cloze_stanza(lines, logical_line_idx, line_groups):
+def cloze_stanza(lines: List[str], logical_line_idx: int, line_groups: Dict[int, int]) -> str:
     """Backward compatibility wrapper."""
     return ClozeGenerator.create_cloze_stanza(lines, logical_line_idx, line_groups)
 
-def build_notes(poem_txt, title=None, poet=None, shuffle_stanzas=True, wrap_lines=True, max_line_length=65):
+def build_notes(poem_txt: str, title: Optional[str] = None, poet: Optional[str] = None, 
+               shuffle_stanzas: bool = True, wrap_lines: bool = True, max_line_length: int = 65) -> List[genanki.Note]:
     """Backward compatibility wrapper."""
     note_builder = NoteBuilder(CLOZE_MODEL)
     config = Config(
@@ -625,11 +640,11 @@ def build_notes(poem_txt, title=None, poet=None, shuffle_stanzas=True, wrap_line
     )
     return note_builder.build_notes(poem_txt, title, poet, config)
 
-def wrap_long_lines(lines, max_length=65):
+def wrap_long_lines(lines: List[str], max_length: int = 65) -> Tuple[List[str], Dict[int, int]]:
     """Backward compatibility wrapper."""
     return LineWrapper.wrap_long_lines(lines, max_length)
 
-def send_to_ankiconnect(deck_name, notes):
+def send_to_ankiconnect(deck_name: str, notes: List[genanki.Note]) -> bool:
     """Backward compatibility wrapper."""
     try:
         return AnkiConnector.send_notes(deck_name, notes)
@@ -723,7 +738,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     parser = create_argument_parser()
     args = parser.parse_args()
