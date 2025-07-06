@@ -29,19 +29,21 @@ This will:
 
 ```bash
 $ python add_new_poem.py
-=== Poetry to Anki - Add New Poem ===
+Poetry to Anki - Add New Poem
+========================================
 
+Enter poem information (* = required):
 * Poem title: The Road Not Taken
 * Author name: Robert Frost
 Collection/Book name: Mountain Interval
 Publication year: 1916
 Source URL: https://www.poetryfoundation.org/poems/44272/the-road-not-taken
 
-✓ Created file: poems/the-road-not-taken.md
-✓ File opened in editor
+✓ Created: poems/the-road-not-taken.md
+✓ Title: The Road Not Taken | Author: Robert Frost | Collection: Mountain Interval | Year: 1916 | Source: https://www.poetryfoundation.org/poems/44272/the-road-not-taken
+✓ Opened in editor
 
-# Add your poem text, then:
-python poetry_to_anki.py  # Generate cards including the new poem
+Next: Add poem text, save, then run 'python poetry_to_anki.py'
 ```
 
 ## Usage
@@ -64,6 +66,12 @@ python poetry_to_anki.py --no-shuffle
 
 # Put all poems in a single deck instead of individual subdecks
 python poetry_to_anki.py --single-deck
+
+# Disable line wrapping (keep original long lines)
+python poetry_to_anki.py --no-wrap
+
+# Adjust line wrapping length (default: 50 characters for mobile-friendly display)
+python poetry_to_anki.py --max-line-length 65
 ```
 
 ## File Format
@@ -86,6 +94,8 @@ Your poem content here...
 
 **Whitespace Preservation**: All leading whitespace and indentation in your poem is automatically preserved. The tool wraps each stanza in `<pre>` tags and styles them with the same EB Garamond font for consistent typography.
 
+**Line Wrapping**: By default, lines longer than 50 characters are automatically wrapped at word boundaries for optimal mobile display. Continuation lines are indented with 4 additional spaces. Use `--no-wrap` to disable or `--max-line-length` to adjust the threshold.
+
 **Available fields:**
 
 - `title`: Poem title (required)
@@ -103,15 +113,16 @@ Your poem content here...
 
 ## Card Format
 
-The generated cards use a clean, poetry-friendly format:
+The generated cards use a clean, poetry-friendly format optimized for both desktop and mobile devices:
 
 ### Line Cloze Cards
 
 - **Question**: Shows the stanza with one line hidden as a cloze deletion
-- **Answer**: Reveals only the missing line, preserving the poem's formatting
+- **Answer**: Reveals the complete stanza with the missing line filled in
 - **Metadata**: Multi-line format showing title, author, collection, source, and line being tested
 - **Styling**: Uses EB Garamond font (with serif fallback), left-justified text, clean layout
-- **Whitespace Preservation**: All original indentation and spacing is preserved using `<pre>` tags with custom CSS that maintains the EB Garamond typography
+- **Whitespace Preservation**: All original indentation and spacing is preserved using `<pre>` tags with custom CSS
+- **Mobile Optimization**: Lines are automatically wrapped at 50 characters by default for portrait mode viewing
 
 ### Transition Cards
 
@@ -142,20 +153,27 @@ The generated cards use a clean, poetry-friendly format:
 
 ## Features
 
-- **Rich Metadata**: YAML frontmatter support for title, author, collection, year, and source URL
-- **Source Tracking**: URLs display as clickable links on cards for easy reference
-- **Beautiful Formatting**: Cards display as `"Title" by Author from <i>Collection</i> (Year)`
-- **Individual Poem Decks**: Each poem gets its own subdeck for focused study (`--individual-decks`, default)
-- **Line Shuffling**: Multiple review passes with random line selection to prevent answer leakage (default)
+### Card Generation & Format
+
+- **Cloze Deletion Cards**: Each stanza becomes multiple cards with one line blanked out per card
+- **Line Shuffling (Default)**: Creates multiple review passes with random line selection to prevent answer leakage
 - **Transition Cards**: Optional cards to help memorize stanza-to-stanza flow (enabled with `--no-shuffle`)
-- **Flexible Organization**: Study individual poems or select the parent deck to study all poems together
-- **Two Card Types**: Line cloze cards + transition cards between stanzas
-- **Transition Cards**: Help memorize the flow between stanzas (can be disabled with `--no-transitions`)
-- **Stanza Shuffling**: Randomize stanza order during review to prevent answer leakage (`--shuffle-stanzas`)
-- Each stanza becomes multiple cloze cards (one per line)
-- **Preserved formatting**: Line breaks are maintained in the card display
-- **Clean answers**: Only the cloze deletion is revealed, not the entire stanza
-- **Proper metadata**: Cards display the correct poem title and author with collection info
-- Notes are tagged with `title:slug` and `author:slug` for easy filtering
-- Support for both .apkg export and live AnkiConnect integration
-- Stable IDs prevent duplicate cards on re-import
+- **Mobile-Optimized Display**: Lines automatically wrap at 50 characters for portrait mode viewing
+- **Typography**: Beautiful EB Garamond font with serif fallbacks and preserved whitespace formatting
+
+### Metadata & Organization
+
+- **Rich YAML Frontmatter**: Support for title, author, collection, year, and source URL
+- **Individual Poem Decks**: Each poem gets its own subdeck for focused study (default behavior)
+- **Flexible Deck Organization**: Study individual poems or select parent deck to study all together
+- **Source Tracking**: URLs display as clickable links on cards for easy reference
+- **Smart Tagging**: Notes tagged with `title:slug` and `author:slug` for easy filtering
+- **Collision Handling**: Automatically appends author names for poems with identical titles
+
+### Technical Features
+
+- **Dual Output Modes**: Export to `.apkg` files or send directly to Anki via AnkiConnect
+- **Stable Card IDs**: Prevents duplicate cards when re-importing updated poem collections
+- **Interactive Poem Addition**: `add_new_poem.py` script with validation and automatic file generation
+- **Preserved Formatting**: All original indentation, line breaks, and spacing maintained using `<pre>` tags
+- **Configurable Line Wrapping**: Adjust wrap length or disable entirely for different display preferences
