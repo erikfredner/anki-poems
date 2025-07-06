@@ -17,6 +17,7 @@ import yaml
 # Stable IDs (generated once, never change to avoid duplicates)
 DECK_ID = 1503075733
 MODEL_ID = 1455106195
+TRANSITION_MODEL_ID = 1455106196  # New ID for transition cards
 
 # Use genanki's built-in cloze model
 CLOZE_MODEL = genanki.Model(
@@ -47,6 +48,52 @@ CLOZE_MODEL = genanki.Model(
 <div style="text-align: center; color: #666; font-size: 14px;">
 {{Metadata}}<br>
 <small>Stanza {{LineNo}}</small>
+</div>''',
+        },
+    ],
+    model_type=genanki.Model.CLOZE,
+)
+
+# Transition model for stanza-to-stanza memorization
+TRANSITION_MODEL = genanki.Model(
+    TRANSITION_MODEL_ID,
+    'Poetry Transition',
+    fields=[
+        {'name': 'PreviousLines'},
+        {'name': 'NextLineCloze'},
+        {'name': 'StanzaNumbers'},
+        {'name': 'Title'},
+        {'name': 'Author'},
+        {'name': 'Metadata'},
+    ],
+    templates=[
+        {
+            'name': 'Transition',
+            'qfmt': '''<div style="font-family: serif; font-size: 18px; line-height: 1.6; text-align: center;">
+<div style="color: #666; font-style: italic; margin-bottom: 10px;">
+{{PreviousLines}}
+</div>
+<div style="border-top: 2px solid #ddd; padding-top: 10px;">
+{{cloze:NextLineCloze}}
+</div>
+</div>
+<hr>
+<div style="text-align: center; color: #666; font-size: 14px;">
+{{Metadata}}<br>
+<small>Transition: Stanza {{StanzaNumbers}}</small>
+</div>''',
+            'afmt': '''<div style="font-family: serif; font-size: 18px; line-height: 1.6; text-align: center;">
+<div style="color: #666; font-style: italic; margin-bottom: 10px;">
+{{PreviousLines}}
+</div>
+<div style="border-top: 2px solid #ddd; padding-top: 10px;">
+{{cloze:NextLineCloze}}
+</div>
+</div>
+<hr>
+<div style="text-align: center; color: #666; font-size: 14px;">
+{{Metadata}}<br>
+<small>Transition: Stanza {{StanzaNumbers}}</small>
 </div>''',
         },
     ],
@@ -112,7 +159,7 @@ def cloze_stanza(lines, blank_idx):
     return '<br>'.join(safe)
 
 
-def build_notes(poem_txt, title=None, poet=None):
+def build_notes(poem_txt, title=None, poet=None, include_transitions=True):
     """Build Anki notes from a poem text."""
     # Parse metadata and poem content
     metadata, poem_content = parse_poem_with_metadata(poem_txt)
@@ -127,6 +174,7 @@ def build_notes(poem_txt, title=None, poet=None):
     stanzas = parse_poem(poem_content)
     notes = []
     
+    # Build regular cloze notes (one per line)
     for s_idx, stanza in enumerate(stanzas, 1):
         for l_idx in range(len(stanza)):
             fields = [
@@ -142,26 +190,93 @@ def build_notes(poem_txt, title=None, poet=None):
                 tags=[f"title:{slugify(title)}", f"author:{slugify(poet)}"]
             )
             notes.append(note)
+    
+    # Build transition notes between stanzas
+    if include_transitions and len(stanzas) > 1:  # Only create transition notes if enabled and there are multiple stanzas
+        transition_notes = build_transition_notes(stanzas, title, poet, metadata_display)
+        notes.extend(transition_notes)
+    
     return notes
+
+
+def build_transition_notes(stanzas, title, poet, metadata_display):
+    """Build transition notes between stanzas."""
+    transition_notes = []
+    
+    for i in range(len(stanzas) - 1):
+        current_stanza = stanzas[i]
+        next_stanza = stanzas[i + 1]
+        
+        # Get the last 2 lines of current stanza (or all lines if stanza has ≤2 lines)
+        if len(current_stanza) <= 2:
+            previous_lines = current_stanza
+        else:
+            previous_lines = current_stanza[-2:]
+        
+        # Get the first line of next stanza for cloze
+        next_first_line = next_stanza[0]
+        
+        # Format the previous lines with line breaks
+        previous_lines_html = '<br>'.join(previous_lines)
+        
+        # Create cloze for the first line of next stanza
+        next_line_cloze = f'{{{{c1::{html.escape(next_first_line)}}}}}'
+        
+        # Create the transition note
+        fields = [
+            previous_lines_html,                    # PreviousLines
+            next_line_cloze,                       # NextLineCloze  
+            f'{i+1} → {i+2}',                      # StanzaNumbers
+            title,                                 # Title
+            poet,                                  # Author
+            metadata_display                       # Metadata
+        ]
+        
+        note = genanki.Note(
+            model=TRANSITION_MODEL,
+            fields=fields,
+            tags=[f"title:{slugify(title)}", f"author:{slugify(poet)}", "transition"]
+        )
+        transition_notes.append(note)
+    
+    return transition_notes
 
 
 def send_to_ankiconnect(deck_name, notes):
     """Send notes to a running Anki instance via AnkiConnect."""
     for note in notes:
+        # Determine model name and fields based on note type
+        if note.model == CLOZE_MODEL:
+            model_name = "Poetry Cloze"
+            fields = {
+                "Text": note.fields[0],
+                "LineNo": note.fields[1],
+                "Title": note.fields[2],
+                "Author": note.fields[3],
+                "Metadata": note.fields[4],
+            }
+        elif note.model == TRANSITION_MODEL:
+            model_name = "Poetry Transition"
+            fields = {
+                "PreviousLines": note.fields[0],
+                "NextLineCloze": note.fields[1],
+                "StanzaNumbers": note.fields[2],
+                "Title": note.fields[3],
+                "Author": note.fields[4],
+                "Metadata": note.fields[5],
+            }
+        else:
+            print("Warning: Unknown model type for note, skipping...")
+            continue
+            
         payload = {
             "action": "addNote",
             "version": 6,
             "params": {
                 "note": {
                     "deckName": deck_name,
-                    "modelName": "Poetry Cloze",
-                    "fields": {
-                        "Text": note.fields[0],
-                        "LineNo": note.fields[1],
-                        "Title": note.fields[2],
-                        "Author": note.fields[3],
-                        "Metadata": note.fields[4],
-                    },
+                    "modelName": model_name,
+                    "fields": fields,
                     "tags": note.tags
                 }
             }
@@ -173,7 +288,9 @@ def send_to_ankiconnect(deck_name, notes):
             if result.get("error"):
                 print(f"AnkiConnect error: {result['error']}")
             else:
-                print(f"Added note: {note.fields[2]} - Line {note.fields[1]}")
+                title = note.fields[2] if note.model == CLOZE_MODEL else note.fields[3]
+                note_type = "line" if note.model == CLOZE_MODEL else "transition"
+                print(f"Added {note_type} note: {title}")
         except requests.exceptions.RequestException as e:
             print(f"Failed to connect to AnkiConnect: {e}")
             print("Make sure Anki is running with AnkiConnect add-on installed.")
@@ -207,8 +324,22 @@ def main():
         default="poetry.apkg",
         help="Output file name for apkg mode (default: poetry.apkg)"
     )
+    parser.add_argument(
+        "--include-transitions",
+        action="store_true",
+        default=True,
+        help="Include transition cards between stanzas (default: True)"
+    )
+    parser.add_argument(
+        "--no-transitions",
+        action="store_true",
+        help="Disable transition cards between stanzas"
+    )
     
     args = parser.parse_args()
+
+    # Handle transition flags
+    include_transitions = args.include_transitions and not args.no_transitions
 
     deck = genanki.Deck(DECK_ID, args.deck_name)
     total_notes = 0
@@ -234,7 +365,7 @@ def main():
             poet, title = map(str.strip, title.split("::", 1))
         
         # Build notes for this poem (will use YAML metadata if available)
-        notes = build_notes(txt, title, poet)
+        notes = build_notes(txt, title, poet, include_transitions)
         for note in notes:
             deck.add_note(note)
         

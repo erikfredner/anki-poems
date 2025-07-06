@@ -20,6 +20,9 @@ python poetry_to_anki.py -f poems/*.txt --mode ankiconnect
 
 # Process specific files
 python poetry_to_anki.py -f poems/sonnet.txt poems/ode.txt --mode apkg
+
+# Disable transition cards between stanzas
+python poetry_to_anki.py -f poems/*.txt --mode apkg --no-transitions
 ```
 
 ## File Format
@@ -50,15 +53,26 @@ Your poem content here...
 
 The generated cards use a clean, poetry-friendly format:
 
+### Line Cloze Cards
+
 - **Question**: Shows the stanza with one line hidden as a cloze deletion
 - **Answer**: Reveals only the missing line, preserving the poem's formatting
 - **Metadata**: Displays poem title, author, and stanza/line number
 - **Styling**: Uses serif font and centered text for better readability
 
+### Transition Cards (New!)
+
+- **Question**: Shows the last line(s) of one stanza and prompts for the first line of the next
+- **Answer**: Reveals the connecting line to help memorize stanza flow
+- **Purpose**: Helps memorize the transitions and overall structure of the poem
+- **Tagging**: Includes "transition" tag for easy filtering
+
 ## Features
 
 - **Rich Metadata**: YAML frontmatter support for title, author, collection, and year
 - **Beautiful Formatting**: Cards display as `"Title" by Author from <i>Collection</i> (Year)`
+- **Two Card Types**: Line cloze cards + transition cards between stanzas
+- **Transition Cards**: Help memorize the flow between stanzas (can be disabled with `--no-transitions`)
 - Each stanza becomes multiple cloze cards (one per line)
 - **Preserved formatting**: Line breaks are maintained in the card display
 - **Clean answers**: Only the cloze deletion is revealed, not the entire stanza
