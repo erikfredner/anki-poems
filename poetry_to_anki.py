@@ -23,7 +23,6 @@ CLOZE_MODEL = genanki.Model(
     'Poetry Cloze',
     fields=[
         {'name': 'Text'},
-        {'name': 'Extra'},
         {'name': 'LineNo'},
         {'name': 'Title'},
         {'name': 'Author'},
@@ -31,8 +30,22 @@ CLOZE_MODEL = genanki.Model(
     templates=[
         {
             'name': 'Cloze',
-            'qfmt': '{{cloze:Text}}<br><br><small>{{Title}} by {{Author}}</small><br><small>Line {{LineNo}}</small>',
-            'afmt': '{{cloze:Text}}<br><br>{{Extra}}<br><br><small>{{Title}} by {{Author}}</small>',
+            'qfmt': '''<div style="font-family: serif; font-size: 18px; line-height: 1.6; text-align: center;">
+{{cloze:Text}}
+</div>
+<hr>
+<div style="text-align: center; color: #666; font-size: 14px;">
+<strong>{{Title}}</strong> by {{Author}}<br>
+<small>Stanza {{LineNo}}</small>
+</div>''',
+            'afmt': '''<div style="font-family: serif; font-size: 18px; line-height: 1.6; text-align: center;">
+{{cloze:Text}}
+</div>
+<hr>
+<div style="text-align: center; color: #666; font-size: 14px;">
+<strong>{{Title}}</strong> by {{Author}}<br>
+<small>Stanza {{LineNo}}</small>
+</div>''',
         },
     ],
     model_type=genanki.Model.CLOZE,
@@ -50,7 +63,8 @@ def cloze_stanza(lines, blank_idx):
     """Create a cloze deletion for the specified line in the stanza."""
     safe = list(lines)
     safe[blank_idx] = f'{{{{c1::{html.escape(safe[blank_idx])}}}}}'
-    return '\n'.join(safe)
+    # Use <br> tags to preserve line breaks in HTML
+    return '<br>'.join(safe)
 
 
 def build_notes(poem_txt, title, poet):
@@ -61,8 +75,7 @@ def build_notes(poem_txt, title, poet):
     for s_idx, stanza in enumerate(stanzas, 1):
         for l_idx in range(len(stanza)):
             fields = [
-                cloze_stanza(stanza, l_idx),      # Text (cloze)
-                '\n'.join(stanza),                # Extra (full stanza)
+                cloze_stanza(stanza, l_idx),      # Text (cloze with <br> formatting)
                 f'{s_idx}.{l_idx+1}',             # LineNo
                 title,                            # Title
                 poet                              # Author
@@ -88,10 +101,9 @@ def send_to_ankiconnect(deck_name, notes):
                     "modelName": "Poetry Cloze",
                     "fields": {
                         "Text": note.fields[0],
-                        "Extra": note.fields[1],
-                        "LineNo": note.fields[2],
-                        "Title": note.fields[3],
-                        "Author": note.fields[4],
+                        "LineNo": note.fields[1],
+                        "Title": note.fields[2],
+                        "Author": note.fields[3],
                     },
                     "tags": note.tags
                 }
@@ -104,7 +116,7 @@ def send_to_ankiconnect(deck_name, notes):
             if result.get("error"):
                 print(f"AnkiConnect error: {result['error']}")
             else:
-                print(f"Added note: {note.fields[3]} - Line {note.fields[2]}")
+                print(f"Added note: {note.fields[2]} - Line {note.fields[1]}")
         except requests.exceptions.RequestException as e:
             print(f"Failed to connect to AnkiConnect: {e}")
             print("Make sure Anki is running with AnkiConnect add-on installed.")

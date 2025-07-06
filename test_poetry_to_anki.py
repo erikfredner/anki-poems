@@ -24,7 +24,7 @@ def test_cloze_stanza():
     """Test cloze deletion creation."""
     lines = ["First line", "Second line", "Third line"]
     cloze = cloze_stanza(lines, 1)
-    expected = "First line\n{{c1::Second line}}\nThird line"
+    expected = "First line<br>{{c1::Second line}}<br>Third line"
     assert cloze == expected, f"Expected '{expected}', got '{cloze}'"
     print("✓ Cloze stanza test passed")
 
@@ -44,10 +44,9 @@ Line 4"""
     # Check first note
     first_note = notes[0]
     assert "{{c1::Line 1}}" in first_note.fields[0]  # Cloze text
-    assert "Line 1\nLine 2" == first_note.fields[1]   # Full stanza
-    assert first_note.fields[2] == "1.1"              # Line number
-    assert first_note.fields[3] == "Test Poem"        # Title
-    assert first_note.fields[4] == "Test Author"      # Author
+    assert first_note.fields[1] == "1.1"              # Line number
+    assert first_note.fields[2] == "Test Poem"        # Title
+    assert first_note.fields[3] == "Test Author"      # Author
     
     # Check tags
     assert "title:test-poem" in first_note.tags

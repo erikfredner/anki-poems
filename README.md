@@ -29,9 +29,21 @@ Place `.txt` files in the `poems/` directory using either:
 - `title.txt` (author will be "Unknown")
 - `Author Name::Title.txt` (author and title parsed from filename)
 
+## Card Format
+
+The generated cards use a clean, poetry-friendly format:
+
+- **Question**: Shows the stanza with one line hidden as a cloze deletion
+- **Answer**: Reveals only the missing line, preserving the poem's formatting
+- **Metadata**: Displays poem title, author, and stanza/line number
+- **Styling**: Uses serif font and centered text for better readability
+
 ## Features
 
 - Each stanza becomes multiple cloze cards (one per line)
+- **Preserved formatting**: Line breaks are maintained in the card display
+- **Clean answers**: Only the cloze deletion is revealed, not the entire stanza
+- **Proper metadata**: Cards display the correct poem title and author
 - Notes are tagged with `title:slug` and `author:slug` for easy filtering
 - Support for both .apkg export and live AnkiConnect integration
 - Stable IDs prevent duplicate cards on re-import
