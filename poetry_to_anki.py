@@ -73,7 +73,7 @@ CARD_TEMPLATE_MAIN = """<div style="font-family: 'EB Garamond', serif; font-size
 {{{{cloze:Text}}}}
 </div>
 <hr>
-<div style="font-family: 'EB Garamond', serif; text-align: center; color: #666; font-size: 14px; line-height: 1.4;">
+<div style="font-family: 'EB Garamond', serif; text-align: left; color: #666; font-size: 14px; line-height: 1.4;">
 {{{{Metadata}}}}
 </div>"""
 
