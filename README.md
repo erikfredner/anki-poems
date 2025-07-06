@@ -2,12 +2,18 @@
 
 Convert plain-text poems into Anki cloze deletion cards where each stanza becomes multiple notes (one blanked-out line per note) with full-stanza answers.
 
-## Setup
+## Usage
 
-```bash
-# The environment is already configured with uv
-source .venv/bin/activate
-```
+1. Clone this repo.
+2. `python add_new_poem.py` to add poems of your choosing to `poems/`
+3. `python poetry_to_anki.py` to generate `poetry.apkg`
+4. Import `poetry.apkg` into [Anki desktop](https://apps.ankiweb.net/).
+5. Memorize poems!
+6. Optional, but recommended: Install [EB Garamond](https://github.com/georgd/EB-Garamond).
+
+## AI Statement
+
+[Claude Sonnet 4](https://www.anthropic.com/claude/sonnet) generated most of this code, as well as the documentation below. I designed, prompted, and tested the implementation.
 
 ## Adding New Poems
 
