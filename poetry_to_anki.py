@@ -309,32 +309,34 @@ class ClozeGenerator:
     
     @staticmethod
     def create_multi_stanza_cloze(stanza1: Stanza, stanza2: Stanza, 
-                                 stanza1_logical_line: int, stanza2_logical_line: int) -> str:
-        """Create a cloze deletion for lines in two successive stanzas."""
+                                 target_stanza: int, logical_line_idx: int) -> str:
+        """Create a cloze deletion for one line in two successive stanzas.
+        
+        Args:
+            stanza1: First stanza
+            stanza2: Second stanza  
+            target_stanza: Which stanza to apply cloze to (0 for first, 1 for second)
+            logical_line_idx: Which logical line in the target stanza to cloze
+        """
         # Combine both stanzas with a blank line between them
         combined_lines = stanza1.lines.copy() + [''] + stanza2.lines.copy()
         
-        # Adjust line groups for the second stanza (offset by first stanza length + 1 for blank line)
-        offset = len(stanza1.lines) + 1
-        combined_line_groups = stanza1.line_groups.copy()
-        
-        # Add second stanza line groups with offset
-        for visual_idx, logical_idx in stanza2.line_groups.items():
-            combined_line_groups[visual_idx + offset] = logical_idx + max(stanza1.line_groups.values()) + 1
-        
-        # Apply cloze to the specified line in first stanza
-        stanza1_wrapped_indices = [i for i, orig_idx in stanza1.line_groups.items() 
-                                  if orig_idx == stanza1_logical_line]
-        for idx in stanza1_wrapped_indices:
-            if idx < len(combined_lines):
-                combined_lines[idx] = f'{{{{c1::{html.escape(combined_lines[idx])}}}}}'
-        
-        # Apply cloze to the specified line in second stanza
-        stanza2_wrapped_indices = [i + offset for i, orig_idx in stanza2.line_groups.items() 
-                                  if orig_idx == stanza2_logical_line]
-        for idx in stanza2_wrapped_indices:
-            if idx < len(combined_lines):
-                combined_lines[idx] = f'{{{{c1::{html.escape(combined_lines[idx])}}}}}'
+        if target_stanza == 0:
+            # Apply cloze to the specified line in first stanza
+            stanza1_wrapped_indices = [i for i, orig_idx in stanza1.line_groups.items() 
+                                      if orig_idx == logical_line_idx]
+            for idx in stanza1_wrapped_indices:
+                if idx < len(stanza1.lines):
+                    combined_lines[idx] = f'{{{{c1::{html.escape(combined_lines[idx])}}}}}'
+        else:
+            # Apply cloze to the specified line in second stanza
+            offset = len(stanza1.lines) + 1  # +1 for blank line
+            stanza2_wrapped_indices = [i for i, orig_idx in stanza2.line_groups.items() 
+                                      if orig_idx == logical_line_idx]
+            for idx in stanza2_wrapped_indices:
+                adjusted_idx = idx + offset
+                if adjusted_idx < len(combined_lines):
+                    combined_lines[adjusted_idx] = f'{{{{c1::{html.escape(combined_lines[adjusted_idx])}}}}}'
         
         return '<pre>' + '\n'.join(combined_lines) + '</pre>'
 
@@ -458,44 +460,68 @@ class NoteBuilder:
             
             if config.shuffle_stanzas:
                 # Create multiple passes with random line selection
-                max_lines = max(len(stanza1_logical_lines), len(stanza2_logical_lines))
+                # Total passes = lines in stanza1 + lines in stanza2
+                total_passes = len(stanza1_logical_lines) + len(stanza2_logical_lines)
                 
-                for pass_num in range(max_lines):
-                    # Pick random lines from each stanza (if available)
-                    stanza1_line = random.choice(stanza1_logical_lines) if stanza1_logical_lines else 0
-                    stanza2_line = random.choice(stanza2_logical_lines) if stanza2_logical_lines else 0
+                for pass_num in range(total_passes):
+                    # Randomly choose whether to cloze from stanza1 or stanza2
+                    available_options = []
                     
-                    note = self._create_multi_stanza_note(
-                        stanza1, stanza2, i, i + 1, stanza1_line, stanza2_line,
-                        title, poet, metadata_display, pass_num + 1
-                    )
-                    notes.append(note)
-            else:
-                # Create all combinations of lines from both stanzas
-                for stanza1_line in stanza1_logical_lines:
-                    for stanza2_line in stanza2_logical_lines:
+                    # Add stanza1 options
+                    for line_idx in stanza1_logical_lines:
+                        available_options.append((0, line_idx))  # (stanza_idx, line_idx)
+                    
+                    # Add stanza2 options  
+                    for line_idx in stanza2_logical_lines:
+                        available_options.append((1, line_idx))
+                    
+                    if available_options:
+                        target_stanza, target_line = random.choice(available_options)
                         note = self._create_multi_stanza_note(
-                            stanza1, stanza2, i, i + 1, stanza1_line, stanza2_line,
-                            title, poet, metadata_display
+                            stanza1, stanza2, i, i + 1, target_stanza, target_line,
+                            title, poet, metadata_display, pass_num + 1
                         )
                         notes.append(note)
+            else:
+                # Create one card for each line in both stanzas
+                # First, cards for each line in stanza1
+                for line_idx in stanza1_logical_lines:
+                    note = self._create_multi_stanza_note(
+                        stanza1, stanza2, i, i + 1, 0, line_idx,
+                        title, poet, metadata_display
+                    )
+                    notes.append(note)
+                
+                # Then, cards for each line in stanza2
+                for line_idx in stanza2_logical_lines:
+                    note = self._create_multi_stanza_note(
+                        stanza1, stanza2, i, i + 1, 1, line_idx,
+                        title, poet, metadata_display
+                    )
+                    notes.append(note)
         
         return notes
     
     def _create_multi_stanza_note(self, stanza1: Stanza, stanza2: Stanza, 
                                  stanza1_idx: int, stanza2_idx: int,
-                                 stanza1_logical_line: int, stanza2_logical_line: int,
+                                 target_stanza: int, logical_line_idx: int,
                                  title: str, poet: str, metadata_display: str,
                                  pass_num: Optional[int] = None) -> genanki.Note:
-        """Create a single multi-stanza Anki note."""
-        line_info = f'Stanzas {stanza1_idx + 1}-{stanza2_idx + 1}, Lines {stanza1_logical_line + 1} & {stanza2_logical_line + 1}'
+        """Create a single multi-stanza Anki note with one cloze deletion.
+        
+        Args:
+            target_stanza: Which stanza to apply cloze to (0 for first, 1 for second)
+            logical_line_idx: Which logical line in the target stanza to cloze
+        """
+        stanza_name = "first" if target_stanza == 0 else "second"
+        line_info = f'Stanzas {stanza1_idx + 1}-{stanza2_idx + 1}, Line {logical_line_idx + 1} ({stanza_name} stanza)'
         
         tags = [f"title:{slugify(title)}", f"author:{slugify(poet)}", "multi-stanza"]
         if pass_num:
             tags.append(f"pass:{pass_num}")
         
         cloze_text = ClozeGenerator.create_multi_stanza_cloze(
-            stanza1, stanza2, stanza1_logical_line, stanza2_logical_line
+            stanza1, stanza2, target_stanza, logical_line_idx
         )
         
         return genanki.Note(

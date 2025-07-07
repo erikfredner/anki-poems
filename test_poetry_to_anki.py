@@ -657,7 +657,7 @@ Line 4b"""
     notes = note_builder.build_notes(poem_text, "Test Poem", "Test Author", config)
     
     # Should have regular cards (8 total: 2 lines × 4 stanzas) + multi-stanza cards
-    # Multi-stanza cards: stanzas 1-2 (4 combinations) + stanzas 3-4 (4 combinations) = 8
+    # Multi-stanza cards: stanzas 1-2 (4 cards: 2 from stanza1 + 2 from stanza2) + stanzas 3-4 (4 cards) = 8
     # Total: 8 regular + 8 multi-stanza = 16 notes
     assert len(notes) >= 16, f"Expected at least 16 notes with multi-stanza enabled, got {len(notes)}"
     
@@ -669,12 +669,17 @@ Line 4b"""
     multi_note = multi_stanza_notes[0]
     multi_text = multi_note.fields[0]  # The cloze text
     
-    # Should contain content from both stanzas
+    # Should contain content from both stanzas but only ONE cloze deletion
+    cloze_count = multi_text.count('{{c1::')
+    assert cloze_count == 1, f"Expected exactly 1 cloze deletion, got {cloze_count}"
+    
+    # Should contain lines from both stanzas
     assert "Line 1" in multi_text or "Line 2" in multi_text, "Multi-stanza note should contain lines from both stanzas"
     
-    # Check line info format
+    # Check line info format (should specify which stanza the cloze is in)
     line_info = multi_note.fields[1]
-    assert "Stanzas" in line_info and "Lines" in line_info, f"Expected multi-stanza line info format, got: {line_info}"
+    assert "Stanzas" in line_info and ("first stanza" in line_info or "second stanza" in line_info), \
+        f"Expected multi-stanza line info format with stanza specification, got: {line_info}"
     
     print("✓ Multi-stanza cards test passed")
 

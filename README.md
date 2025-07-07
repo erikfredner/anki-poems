@@ -143,9 +143,9 @@ The generated cards use a clean, poetry-friendly format optimized for both deskt
 
 ### Multi-Stanza Cards (Optional)
 
-- **Purpose**: Shows two successive stanzas together with clozes to help understand inter-stanza relationships
-- **Format**: Displays stanzas 1-2, 3-4, 5-6, etc. with lines from both stanzas blanked out
-- **Example**: One card might show stanzas 1 and 2 with line 2 of stanza 1 and line 1 of stanza 2 as cloze deletions
+- **Purpose**: Shows two successive stanzas together with one cloze deletion to help understand inter-stanza relationships
+- **Format**: Displays stanzas 1-2, 3-4, 5-6, etc. with exactly one line blanked out from either stanza
+- **Example**: One card might show stanzas 1 and 2 with only line 2 of stanza 1 as a cloze deletion
 - **Benefits**: Helps memorize longer passages and understand how stanzas connect thematically
 - **Tagging**: Includes "multi-stanza" tag for easy filtering
 - **Enable**: Use `--multi-stanza` flag to generate these additional cards alongside regular single-stanza cards
