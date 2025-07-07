@@ -628,6 +628,57 @@ def test_line_wrapping():
     print("✓ Line wrapping test passed")
 
 
+def test_multi_stanza_cards():
+    """Test multi-stanza card generation."""
+    from poetry_to_anki import NoteBuilder, AnkiModelFactory, Config
+    
+    # Test poem with 4 stanzas
+    poem_text = """Line 1a
+Line 1b
+
+Line 2a
+Line 2b
+
+Line 3a
+Line 3b
+
+Line 4a
+Line 4b"""
+    
+    model = AnkiModelFactory.create_cloze_model()
+    note_builder = NoteBuilder(model)
+    
+    # Test with multi-stanza cards enabled
+    config = Config(
+        shuffle_stanzas=False,  # Use sequential for deterministic testing
+        multi_stanza_cards=True
+    )
+    
+    notes = note_builder.build_notes(poem_text, "Test Poem", "Test Author", config)
+    
+    # Should have regular cards (8 total: 2 lines × 4 stanzas) + multi-stanza cards
+    # Multi-stanza cards: stanzas 1-2 (4 combinations) + stanzas 3-4 (4 combinations) = 8
+    # Total: 8 regular + 8 multi-stanza = 16 notes
+    assert len(notes) >= 16, f"Expected at least 16 notes with multi-stanza enabled, got {len(notes)}"
+    
+    # Check that multi-stanza notes exist
+    multi_stanza_notes = [note for note in notes if "multi-stanza" in note.tags]
+    assert len(multi_stanza_notes) >= 8, f"Expected at least 8 multi-stanza notes, got {len(multi_stanza_notes)}"
+    
+    # Check that a multi-stanza note contains content from both stanzas
+    multi_note = multi_stanza_notes[0]
+    multi_text = multi_note.fields[0]  # The cloze text
+    
+    # Should contain content from both stanzas
+    assert "Line 1" in multi_text or "Line 2" in multi_text, "Multi-stanza note should contain lines from both stanzas"
+    
+    # Check line info format
+    line_info = multi_note.fields[1]
+    assert "Stanzas" in line_info and "Lines" in line_info, f"Expected multi-stanza line info format, got: {line_info}"
+    
+    print("✓ Multi-stanza cards test passed")
+
+
 if __name__ == "__main__":
     test_line_wrapping()
     test_parse_poem()
@@ -646,4 +697,5 @@ if __name__ == "__main__":
     test_add_new_poem_functions()
     test_whitespace_preservation()
     test_line_wrapping()
+    test_multi_stanza_cards()
     print("\n✅ All tests passed!")

@@ -73,6 +73,9 @@ python poetry_to_anki.py --no-shuffle
 # Put all poems in a single deck instead of individual subdecks
 python poetry_to_anki.py --single-deck
 
+# Generate additional multi-stanza cards (two successive stanzas with clozes)
+python poetry_to_anki.py --multi-stanza
+
 # Disable line wrapping (keep original long lines)
 python poetry_to_anki.py --no-wrap
 
@@ -138,6 +141,15 @@ The generated cards use a clean, poetry-friendly format optimized for both deskt
 - **Tagging**: Includes "transition" tag for easy filtering
 - **Whitespace Preservation**: Also preserves original formatting and indentation
 
+### Multi-Stanza Cards (Optional)
+
+- **Purpose**: Shows two successive stanzas together with clozes to help understand inter-stanza relationships
+- **Format**: Displays stanzas 1-2, 3-4, 5-6, etc. with lines from both stanzas blanked out
+- **Example**: One card might show stanzas 1 and 2 with line 2 of stanza 1 and line 1 of stanza 2 as cloze deletions
+- **Benefits**: Helps memorize longer passages and understand how stanzas connect thematically
+- **Tagging**: Includes "multi-stanza" tag for easy filtering
+- **Enable**: Use `--multi-stanza` flag to generate these additional cards alongside regular single-stanza cards
+
 ### Line Shuffling (Default)
 
 - **Problem**: When reviewing cards in order, you see the answer to upcoming cards while solving the current one
@@ -164,6 +176,7 @@ The generated cards use a clean, poetry-friendly format optimized for both deskt
 - **Cloze Deletion Cards**: Each stanza becomes multiple cards with one line blanked out per card
 - **Line Shuffling (Default)**: Creates multiple review passes with random line selection to prevent answer leakage
 - **Transition Cards**: Optional cards to help memorize stanza-to-stanza flow (enabled with `--no-shuffle`)
+- **Multi-Stanza Cards**: Optional cards showing two successive stanzas with clozes (enabled with `--multi-stanza`)
 - **Mobile-Optimized Display**: Lines automatically wrap at 50 characters for portrait mode viewing
 - **Typography**: Beautiful EB Garamond font with serif fallbacks and preserved whitespace formatting
 

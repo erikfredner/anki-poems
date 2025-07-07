@@ -89,6 +89,7 @@ class Config:
     individual_decks: bool = True
     wrap_lines: bool = True
     max_line_length: int = 50
+    multi_stanza_cards: bool = False
     
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -305,6 +306,37 @@ class ClozeGenerator:
                 safe[idx] = f'{{{{c1::{html.escape(safe[idx])}}}}}'
         
         return '<pre>' + '\n'.join(safe) + '</pre>'
+    
+    @staticmethod
+    def create_multi_stanza_cloze(stanza1: Stanza, stanza2: Stanza, 
+                                 stanza1_logical_line: int, stanza2_logical_line: int) -> str:
+        """Create a cloze deletion for lines in two successive stanzas."""
+        # Combine both stanzas with a blank line between them
+        combined_lines = stanza1.lines.copy() + [''] + stanza2.lines.copy()
+        
+        # Adjust line groups for the second stanza (offset by first stanza length + 1 for blank line)
+        offset = len(stanza1.lines) + 1
+        combined_line_groups = stanza1.line_groups.copy()
+        
+        # Add second stanza line groups with offset
+        for visual_idx, logical_idx in stanza2.line_groups.items():
+            combined_line_groups[visual_idx + offset] = logical_idx + max(stanza1.line_groups.values()) + 1
+        
+        # Apply cloze to the specified line in first stanza
+        stanza1_wrapped_indices = [i for i, orig_idx in stanza1.line_groups.items() 
+                                  if orig_idx == stanza1_logical_line]
+        for idx in stanza1_wrapped_indices:
+            if idx < len(combined_lines):
+                combined_lines[idx] = f'{{{{c1::{html.escape(combined_lines[idx])}}}}}'
+        
+        # Apply cloze to the specified line in second stanza
+        stanza2_wrapped_indices = [i + offset for i, orig_idx in stanza2.line_groups.items() 
+                                  if orig_idx == stanza2_logical_line]
+        for idx in stanza2_wrapped_indices:
+            if idx < len(combined_lines):
+                combined_lines[idx] = f'{{{{c1::{html.escape(combined_lines[idx])}}}}}'
+        
+        return '<pre>' + '\n'.join(combined_lines) + '</pre>'
 
 
 class NoteBuilder:
@@ -327,10 +359,19 @@ class NoteBuilder:
         
         stanzas = PoemParser.parse_stanzas(poem_content, config.wrap_lines, config.max_line_length)
         
+        notes = []
+        
+        # Generate regular single-stanza cards
         if config.shuffle_stanzas:
-            return self._build_shuffled_notes(stanzas, title, poet, metadata_display)
+            notes.extend(self._build_shuffled_notes(stanzas, title, poet, metadata_display))
         else:
-            return self._build_sequential_notes(stanzas, title, poet, metadata_display)
+            notes.extend(self._build_sequential_notes(stanzas, title, poet, metadata_display))
+        
+        # Generate multi-stanza cards if enabled
+        if config.multi_stanza_cards and len(stanzas) >= 2:
+            notes.extend(self._build_multi_stanza_notes(stanzas, title, poet, metadata_display, config))
+        
+        return notes
     
     def _build_shuffled_notes(self, stanzas: List[Stanza], title: str, poet: str, 
                             metadata_display: str) -> List[genanki.Note]:
@@ -390,6 +431,77 @@ class NoteBuilder:
             model=self.model,
             fields=[
                 ClozeGenerator.create_cloze_stanza(stanza.lines, logical_line_idx, stanza.line_groups),
+                line_info,
+                title,
+                poet,
+                f'{line_info}<br>{metadata_display}'
+            ],
+            tags=tags
+        )
+    
+    def _build_multi_stanza_notes(self, stanzas: List[Stanza], title: str, poet: str, 
+                                 metadata_display: str, config: Config) -> List[genanki.Note]:
+        """Build notes with clozes for two successive stanzas."""
+        notes = []
+        
+        # Process pairs of consecutive stanzas
+        for i in range(0, len(stanzas) - 1, 2):
+            stanza1 = stanzas[i]
+            stanza2 = stanzas[i + 1]
+            
+            if not (stanza1.lines and stanza1.line_groups and stanza2.lines and stanza2.line_groups):
+                continue
+            
+            # Get logical lines for both stanzas
+            stanza1_logical_lines = sorted(set(stanza1.line_groups.values()))
+            stanza2_logical_lines = sorted(set(stanza2.line_groups.values()))
+            
+            if config.shuffle_stanzas:
+                # Create multiple passes with random line selection
+                max_lines = max(len(stanza1_logical_lines), len(stanza2_logical_lines))
+                
+                for pass_num in range(max_lines):
+                    # Pick random lines from each stanza (if available)
+                    stanza1_line = random.choice(stanza1_logical_lines) if stanza1_logical_lines else 0
+                    stanza2_line = random.choice(stanza2_logical_lines) if stanza2_logical_lines else 0
+                    
+                    note = self._create_multi_stanza_note(
+                        stanza1, stanza2, i, i + 1, stanza1_line, stanza2_line,
+                        title, poet, metadata_display, pass_num + 1
+                    )
+                    notes.append(note)
+            else:
+                # Create all combinations of lines from both stanzas
+                for stanza1_line in stanza1_logical_lines:
+                    for stanza2_line in stanza2_logical_lines:
+                        note = self._create_multi_stanza_note(
+                            stanza1, stanza2, i, i + 1, stanza1_line, stanza2_line,
+                            title, poet, metadata_display
+                        )
+                        notes.append(note)
+        
+        return notes
+    
+    def _create_multi_stanza_note(self, stanza1: Stanza, stanza2: Stanza, 
+                                 stanza1_idx: int, stanza2_idx: int,
+                                 stanza1_logical_line: int, stanza2_logical_line: int,
+                                 title: str, poet: str, metadata_display: str,
+                                 pass_num: Optional[int] = None) -> genanki.Note:
+        """Create a single multi-stanza Anki note."""
+        line_info = f'Stanzas {stanza1_idx + 1}-{stanza2_idx + 1}, Lines {stanza1_logical_line + 1} & {stanza2_logical_line + 1}'
+        
+        tags = [f"title:{slugify(title)}", f"author:{slugify(poet)}", "multi-stanza"]
+        if pass_num:
+            tags.append(f"pass:{pass_num}")
+        
+        cloze_text = ClozeGenerator.create_multi_stanza_cloze(
+            stanza1, stanza2, stanza1_logical_line, stanza2_logical_line
+        )
+        
+        return genanki.Note(
+            model=self.model,
+            fields=[
+                cloze_text,
                 line_info,
                 title,
                 poet,
@@ -636,7 +748,8 @@ def build_notes(poem_txt: str, title: Optional[str] = None, poet: Optional[str] 
     config = Config(
         shuffle_stanzas=shuffle_stanzas,
         wrap_lines=wrap_lines,
-        max_line_length=max_line_length
+        max_line_length=max_line_length,
+        multi_stanza_cards=False  # Keep backward compatibility by defaulting to False
     )
     return note_builder.build_notes(poem_txt, title, poet, config)
 
@@ -666,7 +779,8 @@ def create_config_from_args(args: argparse.Namespace) -> Config:
         shuffle_stanzas=args.shuffle_stanzas and not args.no_shuffle,
         individual_decks=args.individual_decks and not args.single_deck,
         wrap_lines=args.wrap_lines and not args.no_wrap,
-        max_line_length=args.max_line_length
+        max_line_length=args.max_line_length,
+        multi_stanza_cards=args.multi_stanza
     )
 
 
@@ -734,6 +848,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=50,
         help="Maximum line length before wrapping (default: 50 characters)"
+    )
+    parser.add_argument(
+        "--multi-stanza",
+        action="store_true",
+        help="Generate additional cards with clozes for two successive stanzas"
     )
     return parser
 
