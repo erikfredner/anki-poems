@@ -54,3 +54,7 @@ python poetry_to_anki.py build --multi-stanza
 
 - `build` creates `poetry.apkg` or sends notes via AnkiConnect.
 - `validate` checks YAML frontmatter (title required if YAML exists).
+
+## AI Statement
+
+The code was largely written by OpenAI's Codex.
