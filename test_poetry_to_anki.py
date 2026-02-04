@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Simple test for poetry_to_anki.py functionality"""
 
-from poetry_to_anki import parse_poem, build_notes, cloze_stanza, parse_poem_with_metadata, format_metadata_display, CLOZE_MODEL
+from poetry_to_anki import parse_poem, build_notes, parse_poem_with_metadata, format_metadata_display, CLOZE_MODEL
 
 def test_parse_poem():
     """Test poem parsing with stanzas separated by blank lines."""
@@ -19,16 +19,6 @@ Line 5"""
     assert stanzas[1] == ["Line 3", "Line 4"] 
     assert stanzas[2] == ["Line 5"]
     print("✓ Poem parsing test passed")
-
-def test_cloze_stanza():
-    """Test cloze deletion creation with preserved whitespace."""
-    lines = ["First line", "Second line", "Third line"]
-    # Create identity line groups for simple test case
-    line_groups = {0: 0, 1: 1, 2: 2}
-    cloze = cloze_stanza(lines, 1, line_groups)
-    expected = "<pre>First line\n{{c1::Second line}}\nThird line</pre>"
-    assert cloze == expected, f"Expected '{expected}', got '{cloze}'"
-    print("✓ Cloze stanza test passed")
 
 def test_build_notes():
     """Test note building from poem text."""
@@ -61,7 +51,6 @@ Line 4"""
     
     print("✓ Note building test passed")
 
-
 def test_yaml_parsing():
     """Test YAML frontmatter parsing."""
     yaml_poem = '''---
@@ -83,7 +72,6 @@ Line 3'''
     assert metadata['year'] == 2024
     assert "Line 1" in content
     print("✓ YAML parsing test passed")
-
 
 def test_metadata_formatting():
     """Test metadata display formatting."""
@@ -176,7 +164,6 @@ Third stanza line two"""
     
     print("✓ Stanza shuffling test passed")
 
-
 def test_shuffling_maintains_stanza_content():
     """Test that shuffling doesn't change the content of stanzas, just their order."""
     import random
@@ -206,22 +193,28 @@ Line C2"""
         text_field = note.fields[0]  # The "Text" field with cloze
         # Remove HTML tags and cloze markup to get the actual lines
         import re
-        # Remove pre tags and extract content
-        lines = re.sub(r'</?pre>', '', text_field)
+        # Remove div wrapper tags and extract content
+        lines = re.sub(r'</?div[^>]*>', '', text_field)
         lines = re.sub(r'\{\{c1::([^}]+)\}\}', r'\1', lines)
         lines = lines.split('\n')
         shuffled_lines.extend(lines)
+
+    shuffled_lines = [line for line in shuffled_lines if line.strip()]
     
-    # The content should include all original lines (though possibly in different order)
+    # The content should include all original lines (context may add extra repeats)
     expected_lines = [
-        'Line A1', 'Line A2', 'Line A1', 'Line A2',  # Stanza A appears twice (once per cloze)
-        'Line B1', 'Line B2', 'Line B1', 'Line B2',  # Stanza B appears twice
-        'Line C1', 'Line C2', 'Line C1', 'Line C2'   # Stanza C appears twice
+        'Line A1', 'Line A2', 'Line A1', 'Line A2',
+        'Line B1', 'Line B2', 'Line B1', 'Line B2',
+        'Line C1', 'Line C2', 'Line C1', 'Line C2'
     ]
     
-    # Sort both lists to compare content regardless of order
-    assert sorted(shuffled_lines) == sorted(expected_lines), \
-        f"Shuffled content doesn't match expected content.\nExpected: {sorted(expected_lines)}\nGot: {sorted(shuffled_lines)}"
+    from collections import Counter
+    expected_counts = Counter(expected_lines)
+    actual_counts = Counter(shuffled_lines)
+    
+    for line, count in expected_counts.items():
+        assert actual_counts[line] >= count, \
+            f"Expected at least {count} occurrences of '{line}', got {actual_counts[line]}"
     
     print("✓ Shuffling content preservation test passed")
 
@@ -286,7 +279,6 @@ Second line of poem two"""
         assert deck_id1 != deck_id2, "Deck IDs should be different for different poems"
         
         print("✓ Individual deck creation test passed")
-
 
 def test_single_vs_individual_deck_modes():
     """Test the difference between single deck and individual deck modes."""
@@ -422,7 +414,6 @@ Second line of stanza two"""
     
     print("✓ Metadata line accuracy test passed")
 
-
 def test_metadata_line_accuracy_with_shuffling():
     """Test that metadata accurately reflects which line is cloze-deleted (with shuffling)."""
     poem_text = """---
@@ -487,6 +478,97 @@ Second line of stanza two"""
     
     print("✓ Metadata line accuracy with shuffling test passed")
 
+
+def test_windowed_cloze_center():
+    """Test that long poems are windowed to 13 lines with the cloze centered."""
+    poem_text = "\n".join([f"Line {i}" for i in range(1, 16)])
+    notes = build_notes(poem_text, shuffle_stanzas=False, wrap_lines=False)
+
+    target_note = next((note for note in notes if note.fields[1] == "Stanza 1, Line 8"), None)
+    assert target_note is not None, "Expected a note for line 8"
+
+    import re
+    content = re.sub(r'</?div[^>]*>', '', target_note.fields[0])
+    lines = content.split('\n')
+
+    assert len(lines) == 13, f"Expected 13 lines, got {len(lines)}"
+    assert lines[0] == "Line 2", f"Expected window to start at Line 2, got {lines[0]}"
+    assert lines[6] == "{{c1::Line 8}}", f"Expected cloze on center line, got {lines[6]}"
+
+    print("✓ Windowed cloze centering test passed")
+
+
+def test_windowed_cloze_near_end():
+    """Test that cloze window shifts when near the end of a poem."""
+    poem_text = "\n".join([f"Line {i}" for i in range(1, 21)])
+    notes = build_notes(poem_text, shuffle_stanzas=False, wrap_lines=False)
+
+    target_note = next((note for note in notes if note.fields[1] == "Stanza 1, Line 20"), None)
+    assert target_note is not None, "Expected a note for line 20"
+
+    import re
+    content = re.sub(r'</?div[^>]*>', '', target_note.fields[0])
+    lines = content.split('\n')
+
+    assert len(lines) == 13, f"Expected 13 lines, got {len(lines)}"
+    assert lines[0] == "Line 8", f"Expected window to start at Line 8, got {lines[0]}"
+    assert lines[-1] == "{{c1::Line 20}}", f"Expected cloze on last line, got {lines[-1]}"
+
+    print("✓ Windowed cloze end test passed")
+
+
+def test_window_counts_wrapped_lines():
+    """Test that wrapped lines count toward the 13-line window."""
+    long_line = (
+        "This is a very long line that should wrap into multiple lines for "
+        "testing the window size behavior."
+    )
+    poem_lines = [f"Line {i}" for i in range(1, 13)]
+    poem_text = "\n".join(poem_lines + [long_line])
+
+    notes = build_notes(poem_text, shuffle_stanzas=False, wrap_lines=True, max_line_length=20)
+    target_note = next((note for note in notes if note.fields[1] == "Stanza 1, Line 13"), None)
+    assert target_note is not None, "Expected a note for stanza 1 line 13"
+
+    import re
+    content = re.sub(r'</?div[^>]*>', '', target_note.fields[0])
+    lines = content.split('\n')
+
+    assert len(lines) == 13, f"Expected 13 lines, got {len(lines)}"
+
+    from poetry_to_anki import wrap_long_lines
+    wrapped, line_groups = wrap_long_lines(poem_lines + [long_line], max_length=20)
+    wrap_count = sum(1 for logical in line_groups.values() if logical == 12)
+    assert wrap_count >= 2, "Expected the long line to wrap into multiple lines for this test"
+
+    expected_first_line = f"Line {wrap_count}"
+    assert lines[0] == expected_first_line, \
+        f"Expected window to start at {expected_first_line}, got {lines[0]}"
+    cloze_count = content.count("{{c1::")
+    assert cloze_count == wrap_count, \
+        f"Expected {wrap_count} cloze segments for the wrapped line, got {cloze_count}"
+
+    print("✓ Wrapped line window counting test passed")
+
+
+def test_window_counts_stanza_break():
+    """Test that stanza breaks count as a line in the 13-line window."""
+    stanza1 = "\n".join([f"Line {i}" for i in range(1, 8)])
+    stanza2 = "\n".join([f"Line {i}" for i in range(8, 15)])
+    poem_text = f"{stanza1}\n\n{stanza2}"
+
+    notes = build_notes(poem_text, shuffle_stanzas=False, wrap_lines=False)
+    target_note = next((note for note in notes if note.fields[1] == "Stanza 1, Line 7"), None)
+    assert target_note is not None, "Expected a note for stanza 1 line 7"
+
+    import re
+    content = re.sub(r'</?div[^>]*>', '', target_note.fields[0])
+    lines = content.split('\n')
+
+    assert len(lines) == 13, f"Expected 13 lines, got {len(lines)}"
+    assert "" in lines, "Expected a blank line for the stanza break"
+
+    print("✓ Stanza break counting test passed")
 
 def test_add_new_poem_functions():
     """Test the functions from add_new_poem.py that can be tested without user interaction."""
@@ -563,13 +645,14 @@ Back to normal"""
     # Check that whitespace is preserved in the cloze text
     for note in notes:
         text_field = note.fields[0]
-        
-        # Should be wrapped in <pre> tags
-        assert text_field.startswith('<pre>'), f"Text should start with <pre>: {text_field}"
-        assert text_field.endswith('</pre>'), f"Text should end with </pre>: {text_field}"
-        
-        # Remove pre tags to check content
-        content = text_field[5:-6]  # Remove <pre> and </pre>
+
+        # Should be wrapped in div tags with whitespace preservation
+        assert text_field.startswith('<div'), f"Text should start with <div>: {text_field}"
+        assert text_field.endswith('</div>'), f"Text should end with </div>: {text_field}"
+
+        # Remove div tags to check content
+        import re
+        content = re.sub(r'</?div[^>]*>', '', text_field)
         
         # Should contain actual whitespace (spaces/tabs), not HTML entities
         if "Indented line" in content:
@@ -579,7 +662,6 @@ Back to normal"""
             indented_line = next((line for line in lines if "Indented line" in line), None)
             if indented_line:
                 # Remove cloze markup if present
-                import re
                 clean_line = re.sub(r'\{\{c1::([^}]+)\}\}', r'\1', indented_line)
                 assert clean_line.startswith('    '), f"Expected 4 spaces before 'Indented line', got: '{clean_line}'"
         
@@ -589,7 +671,6 @@ Back to normal"""
             very_indented = next((line for line in lines if "Very indented line" in line), None)
             if very_indented:
                 # Remove cloze markup if present
-                import re
                 clean_line = re.sub(r'\{\{c1::([^}]+)\}\}', r'\1', very_indented)
                 assert clean_line.startswith('               '), f"Expected many spaces before 'Very indented line', got: '{clean_line}'"
     
@@ -627,10 +708,9 @@ def test_line_wrapping():
     
     print("✓ Line wrapping test passed")
 
-
 def test_multi_stanza_cards():
     """Test multi-stanza card generation."""
-    from poetry_to_anki import NoteBuilder, AnkiModelFactory, Config
+    from poetry_to_anki import NoteBuilder, create_cloze_model, Config
     
     # Test poem with 4 stanzas
     poem_text = """Line 1a
@@ -645,7 +725,7 @@ Line 3b
 Line 4a
 Line 4b"""
     
-    model = AnkiModelFactory.create_cloze_model()
+    model = create_cloze_model()
     note_builder = NoteBuilder(model)
     
     # Test with multi-stanza cards enabled
@@ -683,11 +763,33 @@ Line 4b"""
     
     print("✓ Multi-stanza cards test passed")
 
+def test_multi_stanza_skips_long_stanzas():
+    """Test that multi-stanza cards are skipped for long stanzas."""
+    from poetry_to_anki import NoteBuilder, create_cloze_model, Config
+
+    poem_text = """Line 1a
+Line 1b
+Line 1c
+
+Line 2a
+Line 2b
+Line 2c"""
+
+    model = create_cloze_model()
+    note_builder = NoteBuilder(model)
+    config = Config(
+        shuffle_stanzas=False,
+        multi_stanza_cards=True
+    )
+
+    notes = note_builder.build_notes(poem_text, "Test Poem", "Test Author", config)
+    multi_stanza_notes = [note for note in notes if "multi-stanza" in note.tags]
+    assert len(multi_stanza_notes) == 0, "Expected no multi-stanza notes for long stanzas"
+
+    print("✓ Multi-stanza long stanza skip test passed")
 
 if __name__ == "__main__":
-    test_line_wrapping()
     test_parse_poem()
-    test_cloze_stanza()
     test_build_notes()
     test_yaml_parsing()
     test_metadata_formatting()
@@ -699,8 +801,13 @@ if __name__ == "__main__":
     test_new_shuffling_behavior()
     test_metadata_line_accuracy()
     test_metadata_line_accuracy_with_shuffling()
+    test_windowed_cloze_center()
+    test_windowed_cloze_near_end()
+    test_window_counts_wrapped_lines()
+    test_window_counts_stanza_break()
     test_add_new_poem_functions()
     test_whitespace_preservation()
     test_line_wrapping()
     test_multi_stanza_cards()
+    test_multi_stanza_skips_long_stanzas()
     print("\n✅ All tests passed!")
