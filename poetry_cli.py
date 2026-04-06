@@ -7,8 +7,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import json
+import urllib.error
+import urllib.request
+
 import genanki
-import requests
 
 from poetry_core import Config, NoteBuilder, create_cloze_model, normalize_source_hint, parse_metadata
 from poetry_errors import AnkiConnectError, ConfigurationError, FileProcessingError
@@ -44,15 +47,21 @@ class AnkiConnector:
                 },
             }
 
+            data = json.dumps(payload).encode()
+            req = urllib.request.Request(
+                "http://localhost:8765",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
             try:
-                response = requests.post("http://localhost:8765", json=payload, timeout=10)
-                response.raise_for_status()
-                result = response.json()
-            except requests.exceptions.RequestException as exc:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    result = json.loads(resp.read().decode())
+            except urllib.error.URLError as exc:
                 raise AnkiConnectError(
                     f"Failed to connect to AnkiConnect: {exc}. Make sure Anki is running with AnkiConnect installed."
                 ) from exc
-            except ValueError as exc:
+            except (json.JSONDecodeError, ValueError) as exc:
                 raise AnkiConnectError(f"Invalid JSON response from AnkiConnect: {exc}") from exc
 
             if result.get("error"):

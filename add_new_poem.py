@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from slugify import slugify
+from poetry_core import slugify
 
 
 GENERIC_TITLES = {"poem", "sonnet", "ode", "song"}

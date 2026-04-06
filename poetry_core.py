@@ -1,7 +1,9 @@
 """Core parsing/rendering/note-building logic for poetry-to-anki."""
 
 import html
+import re
 import random
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -11,9 +13,19 @@ import bleach
 import genanki
 import yaml
 from markdown_it import MarkdownIt
-from slugify import slugify
 
 from poetry_errors import ConfigurationError, FileProcessingError
+
+
+def slugify(text: str, max_length: Optional[int] = None) -> str:
+    """Convert text to a URL/tag-safe slug using only stdlib."""
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^\w\s-]", "", text.lower())
+    text = re.sub(r"[\s_]+", "-", text)
+    text = re.sub(r"-+", "-", text).strip("-")
+    if max_length:
+        text = text[:max_length].rstrip("-")
+    return text
 
 
 MODEL_ID = 1455106195
@@ -120,24 +132,17 @@ def create_cloze_model() -> genanki.Model:
 
 def _split_frontmatter(text: str) -> Optional[Tuple[str, str]]:
     lines = text.splitlines()
-    start_idx = 0
-    while start_idx < len(lines) and lines[start_idx].strip() == "":
-        start_idx += 1
-
-    if start_idx >= len(lines) or lines[start_idx].strip() != "---":
+    first_content = next((i for i, ln in enumerate(lines) if ln.strip()), None)
+    if first_content is None or lines[first_content].strip() != "---":
         return None
-
-    end_idx = None
-    for idx in range(start_idx + 1, len(lines)):
-        if lines[idx].strip() == "---":
-            end_idx = idx
-            break
-
+    end_idx = next(
+        (i for i in range(first_content + 1, len(lines)) if lines[i].strip() == "---"),
+        None,
+    )
     if end_idx is None:
         raise FileProcessingError("YAML frontmatter starts with '---' but closing '---' is missing.")
-
-    metadata_text = "\n".join(lines[start_idx + 1:end_idx])
-    poem_body = "\n".join(lines[end_idx + 1:])
+    metadata_text = "\n".join(lines[first_content + 1 : end_idx])
+    poem_body = "\n".join(lines[end_idx + 1 :])
     return metadata_text, poem_body
 
 
@@ -349,7 +354,6 @@ def render_windowed_cloze(
             start = min_i
         if max_i > start + max_lines - 1:
             start = max_i - (max_lines - 1)
-        start = max(0, min(start, total_lines - max_lines))
         end = start + max_lines
 
     output_lines: List[str] = []
@@ -423,14 +427,12 @@ class NoteBuilder:
         stanzas = parse_stanzas(poem_content, config.wrap_lines, config.max_line_length)
         global_poem = build_global_poem(stanzas)
         notes: List[genanki.Note] = []
-        if config.shuffle_stanzas:
-            notes.extend(
-                self._build_shuffled_notes(stanzas, title, poet, metadata_display, poem_key, global_poem)
+        notes.extend(
+            self._build_single_line_notes(
+                stanzas, title, poet, metadata_display, poem_key, global_poem,
+                shuffle=config.shuffle_stanzas,
             )
-        else:
-            notes.extend(
-                self._build_sequential_notes(stanzas, title, poet, metadata_display, poem_key, global_poem)
-            )
+        )
 
         if config.multi_stanza_cards and len(stanzas) >= 2:
             notes.extend(
@@ -446,7 +448,7 @@ class NoteBuilder:
             )
         return notes
 
-    def _build_shuffled_notes(
+    def _build_single_line_notes(
         self,
         stanzas: List[Stanza],
         title: str,
@@ -454,64 +456,47 @@ class NoteBuilder:
         metadata_display: str,
         poem_key: str,
         global_poem: GlobalPoem,
-    ) -> List[genanki.Note]:
-        """
-        Build shuffled notes where each logical line appears exactly once per cycle.
-
-        For each stanza, we shuffle its logical lines once and consume one line per pass.
-        """
-
-        notes: List[genanki.Note] = []
-        shuffled_orders: List[List[int]] = []
-        max_passes = 0
-
-        for stanza in stanzas:
-            logical_lines = self._logical_lines(stanza)
-            random.shuffle(logical_lines)
-            shuffled_orders.append(logical_lines)
-            max_passes = max(max_passes, len(logical_lines))
-
-        for pass_idx in range(max_passes):
-            for stanza_idx, logical_lines in enumerate(shuffled_orders):
-                if pass_idx >= len(logical_lines):
-                    continue
-                notes.append(
-                    self._create_note(
-                        stanza_idx=stanza_idx,
-                        logical_line_idx=logical_lines[pass_idx],
-                        title=title,
-                        poet=poet,
-                        metadata_display=metadata_display,
-                        poem_key=poem_key,
-                        global_poem=global_poem,
-                        pass_num=pass_idx + 1,
-                    )
-                )
-        return notes
-
-    def _build_sequential_notes(
-        self,
-        stanzas: List[Stanza],
-        title: str,
-        poet: str,
-        metadata_display: str,
-        poem_key: str,
-        global_poem: GlobalPoem,
+        shuffle: bool,
     ) -> List[genanki.Note]:
         notes: List[genanki.Note] = []
-        for stanza_idx, stanza in enumerate(stanzas):
-            for logical_line_idx in self._logical_lines(stanza):
-                notes.append(
-                    self._create_note(
-                        stanza_idx=stanza_idx,
-                        logical_line_idx=logical_line_idx,
-                        title=title,
-                        poet=poet,
-                        metadata_display=metadata_display,
-                        poem_key=poem_key,
-                        global_poem=global_poem,
+        if shuffle:
+            orders: List[List[int]] = []
+            max_passes = 0
+            for stanza in stanzas:
+                ll = self._logical_lines(stanza)
+                random.shuffle(ll)
+                orders.append(ll)
+                max_passes = max(max_passes, len(ll))
+            for pass_idx in range(max_passes):
+                for stanza_idx, ll in enumerate(orders):
+                    if pass_idx >= len(ll):
+                        continue
+                    notes.append(
+                        self._create_note(
+                            stanza_idx=stanza_idx,
+                            logical_line_idx=ll[pass_idx],
+                            title=title,
+                            poet=poet,
+                            metadata_display=metadata_display,
+                            poem_key=poem_key,
+                            global_poem=global_poem,
+                            pass_num=pass_idx + 1,
+                        )
                     )
-                )
+        else:
+            for stanza_idx, stanza in enumerate(stanzas):
+                for ll_idx in self._logical_lines(stanza):
+                    notes.append(
+                        self._create_note(
+                            stanza_idx=stanza_idx,
+                            logical_line_idx=ll_idx,
+                            title=title,
+                            poet=poet,
+                            metadata_display=metadata_display,
+                            poem_key=poem_key,
+                            global_poem=global_poem,
+                        )
+                    )
         return notes
 
     def _create_note(
