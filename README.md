@@ -32,9 +32,11 @@ All commands below are run from the `anki-poems` folder.
 
 1. Add a poem (see [Adding poems](#adding-poems) below).
 2. Build the deck:
+
    ```bash
    python poetry_to_anki.py build
    ```
+
 3. Open Anki. Go to **File → Import** and select the `poetry.apkg` file that was just created.
 
 That's it. A new deck called **Poetry** (with a subdeck per poem) will appear in Anki.
@@ -88,6 +90,7 @@ Burnt the fire of thine eyes?
 ```
 
 **Rules:**
+
 - The `---` block at the top is optional, but if present, `title` is required.
 - `collection`, `year`, and `url` are optional.
 - Blank lines separate stanzas. They appear as blank lines in the card window.
@@ -123,21 +126,25 @@ To rebuild after adding or editing poems, run `build` again and re-import. Anki 
 #### Examples
 
 Process only one poem:
+
 ```bash
 python poetry_to_anki.py build -f poems/edgar-allan-poe_the-raven.md
 ```
 
 Use a custom deck name and output file:
+
 ```bash
 python poetry_to_anki.py build --deck-name "My Poems" --output my-poems.apkg
 ```
 
 Disable shuffling (lines tested in order):
+
 ```bash
 python poetry_to_anki.py build --no-shuffle
 ```
 
 Allow longer lines before wrapping:
+
 ```bash
 python poetry_to_anki.py build --max-line-length 70
 ```
@@ -151,6 +158,7 @@ Instead of creating an `.apkg` file and importing it manually, you can send card
 1. Install AnkiConnect from the Anki add-on browser (code `2055492159`).
 2. Restart Anki.
 3. Run:
+
    ```bash
    python poetry_to_anki.py build --mode ankiconnect
    ```
@@ -193,4 +201,4 @@ This reports any files with missing required fields or malformed YAML without bu
 
 ## AI Statement
 
-The code was largely written by Claude (Anthropic).
+The code was largely written by [Claude 4.6 Sonnet](https://www.anthropic.com/news/claude-sonnet-4-6).
