@@ -327,34 +327,42 @@ def build_global_poem(stanzas: List[Stanza]) -> GlobalPoem:
     return GlobalPoem(lines=lines, logical_to_indices=logical_to_indices)
 
 
+def _compute_window(
+    poem: GlobalPoem,
+    target_key: Tuple[int, int],
+    max_lines: int = 13,
+) -> Tuple[int, int]:
+    """Return (start, end) indices of the display window for the given target key."""
+    total_lines = len(poem.lines)
+    indices = poem.logical_to_indices.get(target_key, [])
+    if not indices or total_lines <= max_lines:
+        return 0, total_lines
+    min_i = min(indices)
+    max_i = max(indices)
+    center = (min_i + max_i) // 2
+    start = center - (max_lines // 2)
+    start = max(0, min(start, total_lines - max_lines))
+    if min_i < start:
+        start = min_i
+    if max_i > start + max_lines - 1:
+        start = max_i - (max_lines - 1)
+    return start, start + max_lines
+
+
 def render_windowed_cloze(
     poem: GlobalPoem,
     target_key: Tuple[int, int],
     max_lines: int = 13,
 ) -> str:
     entries = poem.lines
-    total_lines = len(entries)
-    if total_lines == 0:
+    if not entries:
         return POEM_WRAPPER_OPEN + POEM_WRAPPER_CLOSE
 
     indices = poem.logical_to_indices.get(target_key, [])
     if not indices:
         return POEM_WRAPPER_OPEN + "\n".join(entry.text for entry in entries) + POEM_WRAPPER_CLOSE
 
-    if total_lines <= max_lines:
-        start = 0
-        end = total_lines
-    else:
-        min_i = min(indices)
-        max_i = max(indices)
-        center = (min_i + max_i) // 2
-        start = center - (max_lines // 2)
-        start = max(0, min(start, total_lines - max_lines))
-        if min_i < start:
-            start = min_i
-        if max_i > start + max_lines - 1:
-            start = max_i - (max_lines - 1)
-        end = start + max_lines
+    start, end = _compute_window(poem, target_key, max_lines)
 
     output_lines: List[str] = []
     for idx in range(start, end):
@@ -517,7 +525,12 @@ class NoteBuilder:
 
         # Keep GUID tied to stanza+logical line, independent of shuffled pass order.
         guid = make_guid("line", poem_key, stanza_idx, logical_line_idx)
-        cloze_text = render_windowed_cloze(global_poem, (stanza_idx, logical_line_idx))
+        target_key = (stanza_idx, logical_line_idx)
+        cloze_text = render_windowed_cloze(global_poem, target_key)
+
+        start, end = _compute_window(global_poem, target_key)
+        total = len(global_poem.lines)
+        window_info = f"Lines {start + 1}-{end} of {total}"
 
         return genanki.Note(
             model=self.model,
@@ -526,7 +539,7 @@ class NoteBuilder:
                 line_info,
                 title,
                 poet,
-                f"{line_info}<br>{metadata_display}",
+                f"{line_info}<br>{window_info}<br>{metadata_display}",
             ],
             tags=tags,
             guid=guid,
@@ -616,7 +629,12 @@ class NoteBuilder:
 
         target_stanza_idx = stanza1_idx if target_stanza == 0 else stanza2_idx
         guid = make_guid("multi", poem_key, stanza1_idx, stanza2_idx, target_stanza, logical_line_idx)
-        cloze_text = render_windowed_cloze(global_poem, (target_stanza_idx, logical_line_idx))
+        target_key = (target_stanza_idx, logical_line_idx)
+        cloze_text = render_windowed_cloze(global_poem, target_key)
+
+        start, end = _compute_window(global_poem, target_key)
+        total = len(global_poem.lines)
+        window_info = f"Lines {start + 1}-{end} of {total}"
 
         return genanki.Note(
             model=self.model,
@@ -625,7 +643,7 @@ class NoteBuilder:
                 line_info,
                 title,
                 poet,
-                f"{line_info}<br>{metadata_display}",
+                f"{line_info}<br>{window_info}<br>{metadata_display}",
             ],
             tags=tags,
             guid=guid,
