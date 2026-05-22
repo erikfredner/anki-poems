@@ -1,16 +1,16 @@
 # Poetry to Anki
 
-Turn poems into [Anki](https://apps.ankiweb.net) flashcard decks. Each card shows a 13-line window of the poem with one line blanked out — a *cloze deletion* — so you practice recalling the missing line in context. Shuffle through every line in every stanza until you have the poem memorized.
+Turn poems into [Anki](https://apps.ankiweb.net) flashcard decks. Each card shows a 13-line window of the poem with one word blanked out — a *cloze deletion* — so you practice recalling the missing word in context. Work through every word in every line until you have the poem memorized.
 
 ## How the cards work
 
-Each card shows up to 13 consecutive lines of the poem. One line is hidden behind a cloze blank. The bottom of the card shows:
+Each card shows up to 13 consecutive lines of the poem. One word is hidden behind a cloze blank. The bottom of the card shows:
 
-- Which stanza and line is being tested (e.g. *Stanza 2, Line 3*)
+- Which stanza, line, and word is being tested (e.g. *Stanza 2, Line 3, Word 1*)
 - Which lines are visible in the window (e.g. *Lines 5-17 of 30*)
 - The poem title and author, year, and source link (when available)
 
-By default, each stanza's lines are presented in a shuffled order, so consecutive reviews test different lines. Short poems (13 lines or fewer) always show the whole poem on every card.
+Lines are always presented in order. Within each line, words are tested in a shuffled order so consecutive cards don't simply march left-to-right across the line. Short poems (13 lines or fewer) always show the whole poem on every card.
 
 ---
 
@@ -117,7 +117,7 @@ To rebuild after adding or editing poems, run `build` again and re-import. Anki 
 | `--output FILE` | `poetry.apkg` | Name of the output file |
 | `--deck-name NAME` | `Poetry` | Parent deck name in Anki |
 | `--mode ankiconnect` | `apkg` | Send cards directly to a running Anki (see below) |
-| `--no-shuffle` | shuffled | Test lines in order rather than randomly |
+| `--no-shuffle` | shuffled | Test words within each line in order rather than randomly |
 | `--single-deck` | individual decks | Put all poems in one flat deck instead of subdecks |
 | `--no-wrap` | wrapped | Disable automatic line-wrapping |
 | `--max-line-length N` | `50` | Wrap lines longer than N characters |
@@ -187,7 +187,7 @@ This reports any files with missing required fields or malformed YAML without bu
 
 ## Card and deck behavior in detail
 
-**Line shuffling.** By default, each stanza's lines are presented in a different random order on each review pass. If a stanza has four lines, you'll see four cards per pass — one for each line — but in a shuffled order. The next time you review, a new shuffle is used. Disable with `--no-shuffle`.
+**Word shuffling.** Lines are always tested in order (line 1 before line 2, and so on). Within each line, the words are tested in a shuffled order so you are not simply prompted left-to-right across the line. Disable word shuffling with `--no-shuffle`, which causes words to be tested in the order they appear in the line.
 
 **Individual subdecks.** Each poem gets its own subdeck under the parent deck (e.g. `Poetry::The Raven`). If two poems share a title, the author name is appended to distinguish them. Disable with `--single-deck`.
 
