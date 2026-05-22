@@ -40,14 +40,15 @@ poems/*.md → parse_metadata() → parse_stanzas() → wrap_long_lines()
 **Module responsibilities:**
 - `poetry_core.py` — All parsing, rendering, and note-building logic. This is the core.
 - `poetry_cli.py` — CLI argument parsing, file I/O, AnkiConnect communication.
-- `poetry_to_anki.py` — Backward-compatible re-export shim; don't add logic here.
+- `poetry_to_anki.py` — Backward-compatible re-export shim; don't add logic here. Tests import `build_notes` from here.
 - `add_new_poem.py` — Standalone interactive script for adding new poem files.
+- `fetch_poem.py` — Scrapes a poem from poetryfoundation.org and writes a ready-to-use `.md` file to `poems/`.
 - `poetry_errors.py` — Exception hierarchy (`PoetryToAnkiError` → `FileProcessingError`, `ConfigurationError`, `AnkiConnectError`).
 
 **Key concepts in `poetry_core.py`:**
 - **13-line windowing:** Each card shows a 13-line context window centered on the cloze line, shifting at poem boundaries.
 - **GlobalPoem / LineEntry:** Unified poem representation across stanzas with stable logical line keys for GUID generation.
-- **GUID stability:** `make_guid()` is keyed to `(stanza_index, logical_line_index)` — independent of shuffle order — so cards survive re-generation without being treated as new by Anki.
+- **GUID stability (critical):** `make_guid()` is keyed to `(stanza_index, logical_line_index)` — independent of shuffle order — so cards survive re-generation. `MODEL_ID` in `poetry_core.py` is a fixed constant; changing it or changing `compute_poem_key()` logic will orphan all existing Anki cards.
 - **`Config` dataclass:** Controls shuffle, wrapping, multi-stanza cards, etc. All processing options flow through here.
 - **`NoteBuilder`:** Has three note-building paths: shuffled (default), sequential, and multi-stanza.
 
