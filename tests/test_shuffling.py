@@ -4,7 +4,7 @@ import re
 from poetry_to_anki import Config, NoteBuilder, build_notes, create_cloze_model
 
 
-def test_shuffled_mode_visits_each_line_once_per_cycle():
+def test_word_level_notes_visit_each_word():
     poem_text = """Line 1
 Line 2
 Line 3
@@ -13,26 +13,37 @@ Line 4
 Line 5"""
 
     notes = build_notes(poem_text, "Test Poem", "Test Author", shuffle_stanzas=True, wrap_lines=False)
-    assert len(notes) == 5
+    # 5 lines × 2 words each ("Line" and the number) = 10 notes
+    assert len(notes) == 10
 
-    stanza_to_lines = {1: [], 2: []}
+    # Collect (stanza, line, word) triples and verify all are present
+    triples = set()
     for note in notes:
-        match = re.search(r"Stanza (\d+), Line (\d+)", note.fields[1])
+        match = re.match(r"Stanza (\d+), Line (\d+), Word (\d+)", note.fields[1])
         assert match is not None
-        stanza = int(match.group(1))
-        line = int(match.group(2))
-        stanza_to_lines[stanza].append(line)
+        triples.add((int(match.group(1)), int(match.group(2)), int(match.group(3))))
 
-    assert sorted(stanza_to_lines[1]) == [1, 2, 3]
-    assert sorted(stanza_to_lines[2]) == [1, 2]
+    assert triples == {
+        (1, 1, 1), (1, 1, 2),
+        (1, 2, 1), (1, 2, 2),
+        (1, 3, 1), (1, 3, 2),
+        (2, 1, 1), (2, 1, 2),
+        (2, 2, 1), (2, 2, 2),
+    }
 
-    pass_counts = {}
+    # Line ordering must be preserved: all words of line N come before line N+1
+    seen_lines: list = []
     for note in notes:
-        pass_tag = next(tag for tag in note.tags if tag.startswith("pass:"))
-        pass_num = int(pass_tag.split(":", 1)[1])
-        pass_counts[pass_num] = pass_counts.get(pass_num, 0) + 1
+        match = re.match(r"Stanza (\d+), Line (\d+)", note.fields[1])
+        line_id = (int(match.group(1)), int(match.group(2)))
+        if not seen_lines or seen_lines[-1] != line_id:
+            seen_lines.append(line_id)
 
-    assert pass_counts == {1: 2, 2: 2, 3: 1}
+    assert seen_lines == [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2)]
+
+    # No pass: tags
+    for note in notes:
+        assert not any(tag.startswith("pass:") for tag in note.tags)
 
 
 def test_shuffled_guid_is_stable_across_random_order():

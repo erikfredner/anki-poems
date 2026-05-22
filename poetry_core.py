@@ -375,6 +375,51 @@ def render_windowed_cloze(
     return POEM_WRAPPER_OPEN + "\n".join(output_lines) + POEM_WRAPPER_CLOSE
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+_WORD_RE = re.compile(r"\b\w+\b")
+
+
+def _find_words_in_html(html_text: str) -> List[Tuple[str, int, int]]:
+    """Return (word, start, end) tuples for words in html_text, skipping tag content."""
+    masked = _TAG_RE.sub(lambda m: " " * len(m.group()), html_text)
+    return [(m.group(), m.start(), m.end()) for m in _WORD_RE.finditer(masked)]
+
+
+def render_windowed_cloze_word(
+    poem: GlobalPoem,
+    target_key: Tuple[int, int],
+    word_idx: int,
+    max_lines: int = 13,
+) -> str:
+    entries = poem.lines
+    target_indices = poem.logical_to_indices.get(target_key, [])
+    if not entries or not target_indices:
+        return POEM_WRAPPER_OPEN + POEM_WRAPPER_CLOSE
+
+    all_words: List[Tuple[int, str, int, int]] = []
+    for tidx in target_indices:
+        for w, ws, we in _find_words_in_html(entries[tidx].text):
+            all_words.append((tidx, w, ws, we))
+
+    start, end = _compute_window(poem, target_key, max_lines)
+
+    cloze_map: Dict[int, Tuple[int, int, str]] = {}
+    if 0 <= word_idx < len(all_words):
+        tidx, w, ws, we = all_words[word_idx]
+        cloze_map[tidx] = (ws, we, w)
+
+    output_lines: List[str] = []
+    for idx in range(start, end):
+        entry = entries[idx]
+        text = entry.text
+        if idx in cloze_map:
+            ws, we, w = cloze_map[idx]
+            text = text[:ws] + f"{{{{c1::{w}}}}}" + text[we:]
+        output_lines.append(text)
+
+    return POEM_WRAPPER_OPEN + "\n".join(output_lines) + POEM_WRAPPER_CLOSE
+
+
 def make_guid(kind: str, poem_key: str, *parts: object) -> str:
     """Create a stable Anki note GUID."""
 
@@ -467,37 +512,23 @@ class NoteBuilder:
         shuffle: bool,
     ) -> List[genanki.Note]:
         notes: List[genanki.Note] = []
-        if shuffle:
-            orders: List[List[int]] = []
-            max_passes = 0
-            for stanza in stanzas:
-                ll = self._logical_lines(stanza)
-                random.shuffle(ll)
-                orders.append(ll)
-                max_passes = max(max_passes, len(ll))
-            for pass_idx in range(max_passes):
-                for stanza_idx, ll in enumerate(orders):
-                    if pass_idx >= len(ll):
-                        continue
+        for stanza_idx, stanza in enumerate(stanzas):
+            for ll_idx in self._logical_lines(stanza):
+                target_key = (stanza_idx, ll_idx)
+                target_indices = global_poem.logical_to_indices.get(target_key, [])
+                word_count = sum(
+                    len(_find_words_in_html(global_poem.lines[tidx].text))
+                    for tidx in target_indices
+                )
+                word_positions = list(range(word_count))
+                if shuffle:
+                    random.shuffle(word_positions)
+                for word_idx in word_positions:
                     notes.append(
-                        self._create_note(
-                            stanza_idx=stanza_idx,
-                            logical_line_idx=ll[pass_idx],
-                            title=title,
-                            poet=poet,
-                            metadata_display=metadata_display,
-                            poem_key=poem_key,
-                            global_poem=global_poem,
-                            pass_num=pass_idx + 1,
-                        )
-                    )
-        else:
-            for stanza_idx, stanza in enumerate(stanzas):
-                for ll_idx in self._logical_lines(stanza):
-                    notes.append(
-                        self._create_note(
+                        self._create_word_note(
                             stanza_idx=stanza_idx,
                             logical_line_idx=ll_idx,
+                            word_idx=word_idx,
                             title=title,
                             poet=poet,
                             metadata_display=metadata_display,
@@ -507,26 +538,22 @@ class NoteBuilder:
                     )
         return notes
 
-    def _create_note(
+    def _create_word_note(
         self,
         stanza_idx: int,
         logical_line_idx: int,
+        word_idx: int,
         title: str,
         poet: str,
         metadata_display: str,
         poem_key: str,
         global_poem: GlobalPoem,
-        pass_num: Optional[int] = None,
     ) -> genanki.Note:
-        line_info = f"Stanza {stanza_idx + 1}, Line {logical_line_idx + 1}"
+        line_info = f"Stanza {stanza_idx + 1}, Line {logical_line_idx + 1}, Word {word_idx + 1}"
         tags = [f"title:{slugify(title)}", f"author:{slugify(poet)}"]
-        if pass_num:
-            tags.append(f"pass:{pass_num}")
-
-        # Keep GUID tied to stanza+logical line, independent of shuffled pass order.
-        guid = make_guid("line", poem_key, stanza_idx, logical_line_idx)
+        guid = make_guid("word", poem_key, stanza_idx, logical_line_idx, word_idx)
         target_key = (stanza_idx, logical_line_idx)
-        cloze_text = render_windowed_cloze(global_poem, target_key)
+        cloze_text = render_windowed_cloze_word(global_poem, target_key, word_idx)
 
         start, end = _compute_window(global_poem, target_key)
         total = len(global_poem.lines)
