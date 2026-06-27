@@ -7,9 +7,9 @@ Turn poems into [Anki](https://apps.ankiweb.net) flashcard decks. Each card show
 Each card shows the entire poem inside a scrollable box. One word is hidden behind a cloze blank, and the card automatically scrolls so the cloze line is centered when the card opens (and re-centers when you flip to the answer). The bottom of the card shows:
 
 - Which stanza, line, and word is being tested (e.g. *Stanza 2, Line 3, Word 1*)
-- The poem title and author, year, and source link (when available)
+- The poem title and author, collection/year, and source link (when available)
 
-Lines are always presented in order. Within each line, words are tested in a shuffled order so consecutive cards don't simply march left-to-right across the line.
+By default, the cards within each consecutive ~13-line span of the poem are introduced in a shuffled order, so you don't simply march word-by-word from top to bottom. The spans themselves stay in poem order. Use `--no-shuffle` to introduce every word in strict reading order instead.
 
 The auto-scroll relies on a small script in the card template. On clients with limited JavaScript (e.g. AnkiWeb), the full poem still renders and you can scroll to the blank manually.
 
@@ -118,7 +118,7 @@ To rebuild after adding or editing poems, run `build` again and re-import. Anki 
 | `--output FILE` | `poetry.apkg` | Name of the output file |
 | `--deck-name NAME` | `Poetry` | Parent deck name in Anki |
 | `--mode ankiconnect` | `apkg` | Send cards directly to a running Anki (see below) |
-| `--no-shuffle` | shuffled | Test words within each line in order rather than randomly |
+| `--no-shuffle` | shuffled | Introduce cards in strict poem order instead of shuffling within each span |
 | `--single-deck` | individual decks | Put all poems in one flat deck instead of subdecks |
 | `--no-wrap` | wrapped | Disable automatic line-wrapping |
 | `--max-line-length N` | `50` | Wrap lines longer than N characters |
@@ -138,7 +138,7 @@ Use a custom deck name and output file:
 uv run anki-poems build --deck-name "My Poems" --output my-poems.apkg
 ```
 
-Disable shuffling (lines tested in order):
+Disable shuffling (cards introduced in reading order):
 
 ```bash
 uv run anki-poems build --no-shuffle
@@ -188,7 +188,7 @@ This reports any files with missing required fields or malformed YAML without bu
 
 ## Card and deck behavior in detail
 
-**Word shuffling.** Lines are always tested in order (line 1 before line 2, and so on). Within each line, the words are tested in a shuffled order so you are not simply prompted left-to-right across the line. Disable word shuffling with `--no-shuffle`, which causes words to be tested in the order they appear in the line.
+**Card order.** Every word in every line becomes its own card. By default, the cards within each consecutive ~13-line span of the poem are shuffled together, so the order in which new cards are introduced jumps around the span instead of marching word-by-word from the top. The spans themselves stay in poem order. Use `--no-shuffle` to introduce cards in strict reading order (line 1 word 1, line 1 word 2, … then line 2, and so on).
 
 **Individual subdecks.** Each poem gets its own subdeck under the parent deck (e.g. `Poetry::The Raven`). If two poems share a title, the author name is appended to distinguish them. Disable with `--single-deck`.
 
