@@ -1,7 +1,7 @@
 import random
 import re
 
-from poetry_to_anki import Config, NoteBuilder, build_notes, create_cloze_model
+from anki_poems import Config, NoteBuilder, build_notes, create_cloze_model
 
 
 def test_word_level_notes_visit_each_word():

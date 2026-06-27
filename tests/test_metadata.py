@@ -1,4 +1,4 @@
-from poetry_to_anki import format_metadata_display
+from anki_poems import format_metadata_display
 
 
 def test_metadata_formatting_with_url():

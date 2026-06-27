@@ -13,11 +13,11 @@ import urllib.request
 
 import genanki
 
-from poetry_core import Config, NoteBuilder, create_cloze_model, normalize_source_hint, parse_metadata
-from poetry_errors import AnkiConnectError, ConfigurationError, FileProcessingError
+from .core import Config, NoteBuilder, create_cloze_model, normalize_source_hint, parse_metadata
+from .errors import AnkiConnectError, ConfigurationError, FileProcessingError
 
 
-logger = logging.getLogger("poetry_to_anki")
+logger = logging.getLogger("anki_poems")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 

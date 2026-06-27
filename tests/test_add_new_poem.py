@@ -1,4 +1,4 @@
-from add_new_poem import create_filename, validate_url, validate_year
+from anki_poems.add_poem import create_filename, validate_url, validate_year
 
 
 def test_create_filename():

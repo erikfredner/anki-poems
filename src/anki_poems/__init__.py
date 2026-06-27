@@ -1,11 +1,14 @@
-#!/usr/bin/env python
-"""Backward-compatible entrypoint for poetry-to-anki."""
+"""anki-poems: convert poetry Markdown files into Anki cloze-deletion decks.
+
+This module is the stable public API. It re-exports the core building blocks
+and a few convenience wrappers used by tests and integrations.
+"""
 
 from typing import Dict, List, Optional, Tuple
 
 import genanki
 
-from poetry_cli import (
+from .cli import (
     AnkiConnector,
     add_build_arguments,
     add_validate_arguments,
@@ -21,7 +24,7 @@ from poetry_cli import (
     read_poem_file,
     validate_poems,
 )
-from poetry_core import (
+from .core import (
     Config,
     GlobalPoem,
     LineEntry,
@@ -40,10 +43,9 @@ from poetry_core import (
     sanitize_html,
     wrap_long_lines,
 )
-from poetry_errors import AnkiConnectError, ConfigurationError, FileProcessingError, PoetryToAnkiError
+from .errors import AnkiConnectError, ConfigurationError, FileProcessingError, PoetryToAnkiError
 
-
-# Backward compatibility symbols used by tests/integrations.
+# Shared model instance used by the convenience wrappers below.
 CLOZE_MODEL = create_cloze_model()
 
 
@@ -83,9 +85,3 @@ def send_to_ankiconnect(deck_name: str, notes: List[genanki.Note]) -> bool:
         return AnkiConnector.send_notes(deck_name, notes)
     except AnkiConnectError:
         return False
-
-
-if __name__ == "__main__":
-    import sys
-
-    sys.exit(main())

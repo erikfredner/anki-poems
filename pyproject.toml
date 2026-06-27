@@ -1,7 +1,7 @@
 [project]
 name = "anki-poems"
 version = "0.1.0"
-description = "Add your description here"
+description = "Convert poetry Markdown files into Anki cloze-deletion decks"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -10,6 +10,18 @@ dependencies = [
     "markdown-it-py>=3.0.0",
     "pyyaml>=6.0",
 ]
+
+[project.scripts]
+anki-poems = "anki_poems.cli:main"
+anki-poems-add = "anki_poems.add_poem:main"
+anki-poems-fetch = "anki_poems.fetch_poem:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [dependency-groups]
 dev = [

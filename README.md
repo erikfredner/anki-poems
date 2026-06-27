@@ -34,7 +34,7 @@ All commands below are run from the `anki-poems` folder.
 2. Build the deck:
 
    ```bash
-   python poetry_to_anki.py build
+   uv run anki-poems build
    ```
 
 3. Open Anki. Go to **File → Import** and select the `poetry.apkg` file that was just created.
@@ -52,7 +52,7 @@ There are three ways to add a poem.
 If the poem you want is on [poetryfoundation.org](https://www.poetryfoundation.org), copy its URL and run:
 
 ```bash
-python fetch_poem.py https://www.poetryfoundation.org/poems/48860/the-raven
+uv run anki-poems-fetch https://www.poetryfoundation.org/poems/48860/the-raven
 ```
 
 This downloads the poem, preserves indentation and italics, fills in the metadata (title, author, year, source URL), and saves a file to `poems/`. No manual editing required.
@@ -62,7 +62,7 @@ This downloads the poem, preserves indentation and italics, fills in the metadat
 For poems not on Poetry Foundation, run the guided script:
 
 ```bash
-python add_new_poem.py
+uv run anki-poems-add
 ```
 
 It asks for the title, author, and optional metadata, creates a file in `poems/`, and opens it in your text editor. Delete the placeholder line and paste your poem text.
@@ -102,7 +102,7 @@ Burnt the fire of thine eyes?
 ## Building the deck
 
 ```bash
-python poetry_to_anki.py build
+uv run anki-poems build
 ```
 
 This reads every `.md` file in `poems/` and creates `poetry.apkg`. Import that file into Anki.
@@ -128,25 +128,25 @@ To rebuild after adding or editing poems, run `build` again and re-import. Anki 
 Process only one poem:
 
 ```bash
-python poetry_to_anki.py build -f poems/edgar-allan-poe_the-raven.md
+uv run anki-poems build -f poems/edgar-allan-poe_the-raven.md
 ```
 
 Use a custom deck name and output file:
 
 ```bash
-python poetry_to_anki.py build --deck-name "My Poems" --output my-poems.apkg
+uv run anki-poems build --deck-name "My Poems" --output my-poems.apkg
 ```
 
 Disable shuffling (lines tested in order):
 
 ```bash
-python poetry_to_anki.py build --no-shuffle
+uv run anki-poems build --no-shuffle
 ```
 
 Allow longer lines before wrapping:
 
 ```bash
-python poetry_to_anki.py build --max-line-length 70
+uv run anki-poems build --max-line-length 70
 ```
 
 ---
@@ -160,7 +160,7 @@ Instead of creating an `.apkg` file and importing it manually, you can send card
 3. Run:
 
    ```bash
-   python poetry_to_anki.py build --mode ankiconnect
+   uv run anki-poems build --mode ankiconnect
    ```
 
 Anki must be open while the command runs.
@@ -172,13 +172,13 @@ Anki must be open while the command runs.
 Check that all YAML frontmatter is well-formed before building:
 
 ```bash
-python poetry_to_anki.py validate
+uv run anki-poems validate
 ```
 
 Or validate specific files:
 
 ```bash
-python poetry_to_anki.py validate -f poems/the-raven.md
+uv run anki-poems validate -f poems/the-raven.md
 ```
 
 This reports any files with missing required fields or malformed YAML without building a deck.

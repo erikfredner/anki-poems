@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Optional
 
-from poetry_core import slugify
+from .core import slugify
 
 
 POETRY_FOUNDATION_PREFIX = "https://www.poetryfoundation.org/poems/"
@@ -191,7 +191,7 @@ def write_poem_file(title: str, author: str, year: Optional[int], url: str, body
 
 def main() -> int:
     if len(sys.argv) != 2 or not sys.argv[1].startswith(POETRY_FOUNDATION_PREFIX):
-        print("Usage: python fetch_poem.py <url>")
+        print("Usage: anki-poems-fetch <url>")
         print(f"       URL must start with {POETRY_FOUNDATION_PREFIX}")
         return 1
 

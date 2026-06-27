@@ -208,3 +208,6 @@ __marimo__/
 
 # Generated Anki packages
 *.apkg
+
+# macOS
+.DS_Store

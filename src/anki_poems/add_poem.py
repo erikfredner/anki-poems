@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from poetry_core import slugify
+from .core import slugify
 
 
 GENERIC_TITLES = {"poem", "sonnet", "ode", "song"}
@@ -156,7 +156,7 @@ def main():
 
         if open_file_in_editor(str(file_path)):
             print("✓ Opened in editor")
-            print("\nNext: Add poem text, save, then run 'python poetry_to_anki.py'")
+            print("\nNext: Add poem text, save, then run 'uv run anki-poems build'")
 
     except Exception as exc:
         print(f"Error: {exc}")

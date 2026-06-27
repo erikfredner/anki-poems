@@ -1,6 +1,6 @@
 import re
 
-from poetry_to_anki import build_notes
+from anki_poems import build_notes
 
 
 def test_windowed_cloze_centering():

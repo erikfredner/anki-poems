@@ -14,7 +14,7 @@ import genanki
 import yaml
 from markdown_it import MarkdownIt
 
-from poetry_errors import ConfigurationError, FileProcessingError
+from .errors import ConfigurationError, FileProcessingError
 
 
 def slugify(text: str, max_length: Optional[int] = None) -> str:

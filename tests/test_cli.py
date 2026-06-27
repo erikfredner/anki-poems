@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from poetry_cli import main, output_results, validate_poems
-from poetry_to_anki import Config
+from anki_poems import Config
+from anki_poems.cli import main, output_results, validate_poems
 
 
 def test_build_returns_nonzero_when_processing_fails(tmp_path):
@@ -33,7 +33,7 @@ def test_ankiconnect_preserves_subdeck_names(monkeypatch):
         calls.append((deck_name, len(notes)))
         return True
 
-    monkeypatch.setattr("poetry_cli.AnkiConnector.send_notes", staticmethod(fake_send_notes))
+    monkeypatch.setattr("anki_poems.cli.AnkiConnector.send_notes", staticmethod(fake_send_notes))
 
     config = Config(mode="ankiconnect", deck_name="Poetry", individual_decks=True)
     decks = {

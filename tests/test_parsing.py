@@ -1,7 +1,7 @@
 import pytest
 
-from poetry_errors import FileProcessingError
-from poetry_to_anki import parse_poem, parse_poem_with_metadata, wrap_long_lines
+from anki_poems import parse_poem, parse_poem_with_metadata, wrap_long_lines
+from anki_poems.errors import FileProcessingError
 
 
 def test_parse_poem_stanzas():
