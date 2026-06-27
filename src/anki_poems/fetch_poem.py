@@ -34,9 +34,26 @@ class PoetryFoundationParser(HTMLParser):
         self._in_em = False
         self._current_line = ""
         self._after_poem_body = False
+        # Poem Guide glosses: hidden <span style="display:none"> elements holding
+        # vocabulary definitions. Their text must be skipped so it doesn't corrupt
+        # the line. Track tag depth to skip nested tags (<strong>, <em>) too.
+        self._in_annotation_text = False
+        self._annotation_depth = 0
 
     def handle_starttag(self, tag, attrs):
         attrs_dict = dict(attrs)
+
+        # Inside a hidden Poem Guide gloss: count nested tags, suppress all content.
+        if self._in_annotation_text:
+            self._annotation_depth += 1
+            return
+
+        if tag == "span" and self._in_line_div:
+            style = attrs_dict.get("style", "").replace(" ", "")
+            if "display:none" in style:
+                self._in_annotation_text = True
+                self._annotation_depth = 1
+                return
 
         if tag == "h1":
             self._in_h1 = True
@@ -73,6 +90,12 @@ class PoetryFoundationParser(HTMLParser):
                     self._current_line = ""
 
     def handle_endtag(self, tag):
+        if self._in_annotation_text:
+            self._annotation_depth -= 1
+            if self._annotation_depth == 0:
+                self._in_annotation_text = False
+            return
+
         if tag == "h1":
             self._in_h1 = False
             self._in_h1_p = False
@@ -109,6 +132,9 @@ class PoetryFoundationParser(HTMLParser):
                 self._current_line = ""
 
     def handle_data(self, data):
+        if self._in_annotation_text:
+            return
+
         if self._in_h1_p and not self.title:
             self.title = data.strip()
             return
@@ -118,10 +144,20 @@ class PoetryFoundationParser(HTMLParser):
             return
 
         if self._in_line_div:
-            # Strip CR/LF artifact and the single regular space that follows it.
-            # Meaningful indentation uses \xa0 (non-breaking spaces), not regular spaces.
-            # Convert \xa0 → regular space so the file stays clean and wrapping works.
-            text = data.lstrip("\r\n ").replace("\xa0", " ")
+            # Meaningful indentation uses \xa0 (non-breaking spaces), not regular
+            # spaces. Convert \xa0 → regular space so the file stays clean and
+            # wrapping works.
+            if self._current_line == "":
+                # Start of line: drop the CR/LF artifact and the single regular
+                # space that follows it (leading \xa0 indentation is preserved).
+                text = data.lstrip("\r\n ").replace("\xa0", " ")
+            else:
+                # Continuation (text after an annotated word, em span, etc.). Keep
+                # the leading space that separates words — only drop CR/LF — but
+                # collapse the seam if the previous chunk already ended in a space.
+                text = data.lstrip("\r\n").replace("\xa0", " ")
+                if self._current_line.endswith(" ") and text.startswith(" "):
+                    text = text.lstrip(" ")
             self._current_line += text
             return
 
