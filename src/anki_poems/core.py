@@ -30,9 +30,34 @@ def slugify(text: str, max_length: Optional[int] = None) -> str:
 
 MODEL_ID = 1455106195
 
-WINDOW_LINES = 13
+# Number of consecutive lines grouped together when shuffling the initial review
+# order (see NoteBuilder._build_single_line_notes). This governs review ordering
+# only -- every card now displays the full poem, scrolled to the cloze line.
+SHUFFLE_CHUNK_LINES = 13
 
-CARD_TEMPLATE = '<div style="text-align: left;">{{cloze:Text}}<hr>{{Metadata}}</div>'
+CARD_CSS = (
+    "#poem { white-space: pre-wrap; max-height: 65vh; overflow-y: auto; }\n"
+    ".cloze { font-weight: bold; }\n"
+)
+
+# The poem renders inside a scrollable #poem box. A small script centers the
+# active cloze span (.cloze, present on both the question and answer sides) when
+# the card opens. If the script is stripped (e.g. on AnkiWeb), the poem still
+# renders in full and can be scrolled manually.
+CARD_TEMPLATE = (
+    '<div style="text-align: left;">'
+    '<div id="poem">{{cloze:Text}}</div>'
+    "<hr>{{Metadata}}"
+    "</div>"
+    "<script>"
+    "(function(){"
+    'function c(){var b=document.getElementById("poem");'
+    'var e=b&&b.querySelector(".cloze");'
+    'if(e&&e.scrollIntoView){e.scrollIntoView({block:"center",inline:"nearest"});}}'
+    "requestAnimationFrame(function(){c();setTimeout(c,50);});"
+    "})();"
+    "</script>"
+)
 POEM_WRAPPER_OPEN = '<div style="white-space: pre-wrap;">'
 POEM_WRAPPER_CLOSE = "</div>"
 MARKDOWN = MarkdownIt("commonmark", {"html": False})
@@ -128,6 +153,7 @@ def create_cloze_model() -> genanki.Model:
                 "afmt": CARD_TEMPLATE,
             },
         ],
+        css=CARD_CSS,
         model_type=genanki.Model.CLOZE,
     )
 
@@ -329,46 +355,17 @@ def build_global_poem(stanzas: List[Stanza]) -> GlobalPoem:
     return GlobalPoem(lines=lines, logical_to_indices=logical_to_indices)
 
 
-def _compute_window(
+def render_cloze(
     poem: GlobalPoem,
     target_key: Tuple[int, int],
-    max_lines: int = WINDOW_LINES,
-) -> Tuple[int, int]:
-    """Return (start, end) indices of the display window for the given target key."""
-    total_lines = len(poem.lines)
-    indices = poem.logical_to_indices.get(target_key, [])
-    if not indices or total_lines <= max_lines:
-        return 0, total_lines
-    min_i = min(indices)
-    max_i = max(indices)
-    center = (min_i + max_i) // 2
-    start = center - (max_lines // 2)
-    start = max(0, min(start, total_lines - max_lines))
-    if min_i < start:
-        start = min_i
-    if max_i > start + max_lines - 1:
-        start = max_i - (max_lines - 1)
-    return start, start + max_lines
-
-
-def render_windowed_cloze(
-    poem: GlobalPoem,
-    target_key: Tuple[int, int],
-    max_lines: int = WINDOW_LINES,
 ) -> str:
+    """Render the full poem, clozing the line identified by ``target_key``."""
     entries = poem.lines
     if not entries:
         return POEM_WRAPPER_OPEN + POEM_WRAPPER_CLOSE
 
-    indices = poem.logical_to_indices.get(target_key, [])
-    if not indices:
-        return POEM_WRAPPER_OPEN + "\n".join(entry.text for entry in entries) + POEM_WRAPPER_CLOSE
-
-    start, end = _compute_window(poem, target_key, max_lines)
-
     output_lines: List[str] = []
-    for idx in range(start, end):
-        entry = entries[idx]
+    for entry in entries:
         text = entry.text
         if entry.logical_key == target_key:
             text = f"{{{{c1::{text}}}}}"
@@ -387,12 +384,12 @@ def _find_words_in_html(html_text: str) -> List[Tuple[str, int, int]]:
     return [(m.group(), m.start(), m.end()) for m in _WORD_RE.finditer(masked)]
 
 
-def render_windowed_cloze_word(
+def render_cloze_word(
     poem: GlobalPoem,
     target_key: Tuple[int, int],
     word_idx: int,
-    max_lines: int = WINDOW_LINES,
 ) -> str:
+    """Render the full poem, clozing a single word on the target line."""
     entries = poem.lines
     target_indices = poem.logical_to_indices.get(target_key, [])
     if not entries or not target_indices:
@@ -403,16 +400,13 @@ def render_windowed_cloze_word(
         for w, ws, we in _find_words_in_html(entries[tidx].text):
             all_words.append((tidx, w, ws, we))
 
-    start, end = _compute_window(poem, target_key, max_lines)
-
     cloze_map: Dict[int, Tuple[int, int, str]] = {}
     if 0 <= word_idx < len(all_words):
         tidx, w, ws, we = all_words[word_idx]
         cloze_map[tidx] = (ws, we, w)
 
     output_lines: List[str] = []
-    for idx in range(start, end):
-        entry = entries[idx]
+    for idx, entry in enumerate(entries):
         text = entry.text
         if idx in cloze_map:
             ws, we, w = cloze_map[idx]
@@ -549,9 +543,9 @@ class NoteBuilder:
                 emit([(stanza_idx, ll_idx, word_idx) for word_idx in range(word_count)])
             return notes
 
-        # Partition lines into consecutive ~WINDOW_LINES-tall chunks, then shuffle
-        # all word-clozes within each chunk so the initial review order jumps around
-        # the window instead of marching line-by-line. Chunks stay in poem order.
+        # Partition lines into consecutive SHUFFLE_CHUNK_LINES-tall chunks, then
+        # shuffle all word-clozes within each chunk so the initial review order
+        # jumps around instead of marching line-by-line. Chunks stay in poem order.
         def emit_shuffled(chunk: List[Tuple[int, int, int, int]]) -> None:
             units = [
                 (stanza_idx, ll_idx, word_idx)
@@ -565,7 +559,7 @@ class NoteBuilder:
         chunk_start = lines[0][0] if lines else 0
         for line in lines:
             global_idx = line[0]
-            if chunk and global_idx >= chunk_start + WINDOW_LINES:
+            if chunk and global_idx >= chunk_start + SHUFFLE_CHUNK_LINES:
                 emit_shuffled(chunk)
                 chunk = []
                 chunk_start = global_idx
@@ -590,11 +584,7 @@ class NoteBuilder:
         tags = [f"title:{slugify(title)}", f"author:{slugify(poet)}"]
         guid = make_guid("word", poem_key, stanza_idx, logical_line_idx, word_idx)
         target_key = (stanza_idx, logical_line_idx)
-        cloze_text = render_windowed_cloze_word(global_poem, target_key, word_idx)
-
-        start, end = _compute_window(global_poem, target_key)
-        total = len(global_poem.lines)
-        window_info = f"Lines {start + 1}-{end} of {total}"
+        cloze_text = render_cloze_word(global_poem, target_key, word_idx)
 
         return genanki.Note(
             model=self.model,
@@ -603,7 +593,7 @@ class NoteBuilder:
                 line_info,
                 title,
                 poet,
-                f"{line_info}<br>{window_info}<br>{metadata_display}",
+                f"{line_info}<br>{metadata_display}",
             ],
             tags=tags,
             guid=guid,
@@ -694,11 +684,7 @@ class NoteBuilder:
         target_stanza_idx = stanza1_idx if target_stanza == 0 else stanza2_idx
         guid = make_guid("multi", poem_key, stanza1_idx, stanza2_idx, target_stanza, logical_line_idx)
         target_key = (target_stanza_idx, logical_line_idx)
-        cloze_text = render_windowed_cloze(global_poem, target_key)
-
-        start, end = _compute_window(global_poem, target_key)
-        total = len(global_poem.lines)
-        window_info = f"Lines {start + 1}-{end} of {total}"
+        cloze_text = render_cloze(global_poem, target_key)
 
         return genanki.Note(
             model=self.model,
@@ -707,7 +693,7 @@ class NoteBuilder:
                 line_info,
                 title,
                 poet,
-                f"{line_info}<br>{window_info}<br>{metadata_display}",
+                f"{line_info}<br>{metadata_display}",
             ],
             tags=tags,
             guid=guid,

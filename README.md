@@ -1,16 +1,17 @@
 # Poetry to Anki
 
-Turn poems into [Anki](https://apps.ankiweb.net) flashcard decks. Each card shows a 13-line window of the poem with one word blanked out — a *cloze deletion* — so you practice recalling the missing word in context. Work through every word in every line until you have the poem memorized.
+Turn poems into [Anki](https://apps.ankiweb.net) flashcard decks. Each card shows the full poem with one word blanked out — a *cloze deletion* — and opens scrolled to the blanked word, so you practice recalling the missing word in its full context. Work through every word in every line until you have the poem memorized.
 
 ## How the cards work
 
-Each card shows up to 13 consecutive lines of the poem. One word is hidden behind a cloze blank. The bottom of the card shows:
+Each card shows the entire poem inside a scrollable box. One word is hidden behind a cloze blank, and the card automatically scrolls so the cloze line is centered when the card opens (and re-centers when you flip to the answer). The bottom of the card shows:
 
 - Which stanza, line, and word is being tested (e.g. *Stanza 2, Line 3, Word 1*)
-- Which lines are visible in the window (e.g. *Lines 5-17 of 30*)
 - The poem title and author, year, and source link (when available)
 
-Lines are always presented in order. Within each line, words are tested in a shuffled order so consecutive cards don't simply march left-to-right across the line. Short poems (13 lines or fewer) always show the whole poem on every card.
+Lines are always presented in order. Within each line, words are tested in a shuffled order so consecutive cards don't simply march left-to-right across the line.
+
+The auto-scroll relies on a small script in the card template. On clients with limited JavaScript (e.g. AnkiWeb), the full poem still renders and you can scroll to the blank manually.
 
 ---
 
@@ -93,7 +94,7 @@ Burnt the fire of thine eyes?
 
 - The `---` block at the top is optional, but if present, `title` is required.
 - `collection`, `year`, and `url` are optional.
-- Blank lines separate stanzas. They appear as blank lines in the card window.
+- Blank lines separate stanzas. They appear as blank lines on the card.
 - Inline Markdown works in the poem body: `*italic*`, `**bold**`, `` `code` ``, `[link text](url)`.
 - Leading spaces on a line are preserved — useful for indented lines.
 
@@ -191,7 +192,7 @@ This reports any files with missing required fields or malformed YAML without bu
 
 **Individual subdecks.** Each poem gets its own subdeck under the parent deck (e.g. `Poetry::The Raven`). If two poems share a title, the author name is appended to distinguish them. Disable with `--single-deck`.
 
-**13-line window.** Each card shows at most 13 lines. For poems longer than 13 lines, the window is centered on the cloze line and shifts at the beginning and end of the poem. Wrapped lines and blank stanza-break lines both count toward the 13.
+**Full poem with cloze-anchored scroll.** Each card shows the whole poem in a scrollable box and opens centered on the cloze line, re-centering when you reveal the answer. The auto-scroll uses a small script in the card template; where JavaScript is restricted (e.g. AnkiWeb) the full poem still renders and you scroll to the blank yourself.
 
 **Multi-stanza cards.** The optional `--multi-stanza` flag generates additional cards that show two consecutive stanzas together (when each stanza has two or fewer logical lines). These cards test whether you can bridge the stanza boundary.
 

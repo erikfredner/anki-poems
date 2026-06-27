@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv run python -m pytest tests/ -v
 
 # Run a single test file
-uv run python -m pytest tests/test_windowing.py -v
+uv run python -m pytest tests/test_rendering.py -v
 
 # Build the Anki deck (outputs poetry.apkg)
 uv run anki-poems build
@@ -42,7 +42,7 @@ This tool converts poetry `.md` files into Anki cloze-deletion flashcard decks.
 ```
 poems/*.md → parse_metadata() → parse_stanzas() → wrap_long_lines()
            → build_global_poem() → NoteBuilder.build_notes()
-           → render_windowed_cloze() → genanki.Note → .apkg / AnkiConnect
+           → render_cloze() → genanki.Note → .apkg / AnkiConnect
 ```
 
 The source package lives under `src/anki_poems/` (standard src layout).
@@ -57,7 +57,7 @@ The source package lives under `src/anki_poems/` (standard src layout).
 - `src/anki_poems/errors.py` — Exception hierarchy (`PoetryToAnkiError` → `FileProcessingError`, `ConfigurationError`, `AnkiConnectError`).
 
 **Key concepts in `core.py`:**
-- **13-line windowing:** Each card shows a 13-line context window centered on the cloze line, shifting at poem boundaries.
+- **Full-poem cards with cloze-anchored scroll:** Each card renders the entire poem inside a scrollable `#poem` box (`CARD_CSS`/`CARD_TEMPLATE` in `core.py`). A small template `<script>` calls `scrollIntoView({block:"center"})` on the active `.cloze` span so the card opens centered on the cloze line (on both question and answer sides). If the script is stripped (e.g. AnkiWeb), the full poem still renders and scrolls manually. `SHUFFLE_CHUNK_LINES` (13) no longer governs display — it only chunks the initial review order in `_build_single_line_notes`.
 - **GlobalPoem / LineEntry:** Unified poem representation across stanzas with stable logical line keys for GUID generation.
 - **GUID stability (critical):** `make_guid()` is keyed to `(stanza_index, logical_line_index)` — independent of shuffle order — so cards survive re-generation. `MODEL_ID` in `core.py` is a fixed constant; changing it or changing `compute_poem_key()` logic will orphan all existing Anki cards.
 - **`Config` dataclass:** Controls shuffle, wrapping, multi-stanza cards, etc. All processing options flow through here.

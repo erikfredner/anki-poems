@@ -37,7 +37,7 @@ Line 5"""
 
 
 def test_shuffle_groups_clozes_by_window():
-    # 30 single-word-pair lines, one stanza. With WINDOW_LINES=13, chunks are
+    # 30 single-word-pair lines, one stanza. With SHUFFLE_CHUNK_LINES=13, chunks are
     # lines 1-13, 14-26, 27-30 (global line index == line number - 1 here).
     poem_text = "\n".join(f"Line {i}" for i in range(1, 31))
 

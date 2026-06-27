@@ -38,8 +38,8 @@ from .core import (
     normalize_source_hint,
     parse_metadata,
     parse_stanzas,
+    render_cloze,
     render_inline_markdown,
-    render_windowed_cloze,
     sanitize_html,
     wrap_long_lines,
 )
