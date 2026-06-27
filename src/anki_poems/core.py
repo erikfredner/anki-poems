@@ -30,6 +30,8 @@ def slugify(text: str, max_length: Optional[int] = None) -> str:
 
 MODEL_ID = 1455106195
 
+WINDOW_LINES = 13
+
 CARD_TEMPLATE = '<div style="text-align: left;">{{cloze:Text}}<hr>{{Metadata}}</div>'
 POEM_WRAPPER_OPEN = '<div style="white-space: pre-wrap;">'
 POEM_WRAPPER_CLOSE = "</div>"
@@ -330,7 +332,7 @@ def build_global_poem(stanzas: List[Stanza]) -> GlobalPoem:
 def _compute_window(
     poem: GlobalPoem,
     target_key: Tuple[int, int],
-    max_lines: int = 13,
+    max_lines: int = WINDOW_LINES,
 ) -> Tuple[int, int]:
     """Return (start, end) indices of the display window for the given target key."""
     total_lines = len(poem.lines)
@@ -352,7 +354,7 @@ def _compute_window(
 def render_windowed_cloze(
     poem: GlobalPoem,
     target_key: Tuple[int, int],
-    max_lines: int = 13,
+    max_lines: int = WINDOW_LINES,
 ) -> str:
     entries = poem.lines
     if not entries:
@@ -389,7 +391,7 @@ def render_windowed_cloze_word(
     poem: GlobalPoem,
     target_key: Tuple[int, int],
     word_idx: int,
-    max_lines: int = 13,
+    max_lines: int = WINDOW_LINES,
 ) -> str:
     entries = poem.lines
     target_indices = poem.logical_to_indices.get(target_key, [])
@@ -512,30 +514,65 @@ class NoteBuilder:
         shuffle: bool,
     ) -> List[genanki.Note]:
         notes: List[genanki.Note] = []
+
+        # Ordered list of (global_idx, stanza_idx, ll_idx, word_count) for every
+        # logical line, in poem order. global_idx is the line's first visual line.
+        lines: List[Tuple[int, int, int, int]] = []
         for stanza_idx, stanza in enumerate(stanzas):
             for ll_idx in self._logical_lines(stanza):
-                target_key = (stanza_idx, ll_idx)
-                target_indices = global_poem.logical_to_indices.get(target_key, [])
+                target_indices = global_poem.logical_to_indices.get((stanza_idx, ll_idx), [])
+                if not target_indices:
+                    continue
                 word_count = sum(
                     len(_find_words_in_html(global_poem.lines[tidx].text))
                     for tidx in target_indices
                 )
-                word_positions = list(range(word_count))
-                if shuffle:
-                    random.shuffle(word_positions)
-                for word_idx in word_positions:
-                    notes.append(
-                        self._create_word_note(
-                            stanza_idx=stanza_idx,
-                            logical_line_idx=ll_idx,
-                            word_idx=word_idx,
-                            title=title,
-                            poet=poet,
-                            metadata_display=metadata_display,
-                            poem_key=poem_key,
-                            global_poem=global_poem,
-                        )
+                lines.append((min(target_indices), stanza_idx, ll_idx, word_count))
+
+        def emit(units: List[Tuple[int, int, int]]) -> None:
+            for stanza_idx, ll_idx, word_idx in units:
+                notes.append(
+                    self._create_word_note(
+                        stanza_idx=stanza_idx,
+                        logical_line_idx=ll_idx,
+                        word_idx=word_idx,
+                        title=title,
+                        poet=poet,
+                        metadata_display=metadata_display,
+                        poem_key=poem_key,
+                        global_poem=global_poem,
                     )
+                )
+
+        if not shuffle:
+            for _, stanza_idx, ll_idx, word_count in lines:
+                emit([(stanza_idx, ll_idx, word_idx) for word_idx in range(word_count)])
+            return notes
+
+        # Partition lines into consecutive ~WINDOW_LINES-tall chunks, then shuffle
+        # all word-clozes within each chunk so the initial review order jumps around
+        # the window instead of marching line-by-line. Chunks stay in poem order.
+        def emit_shuffled(chunk: List[Tuple[int, int, int, int]]) -> None:
+            units = [
+                (stanza_idx, ll_idx, word_idx)
+                for _, stanza_idx, ll_idx, word_count in chunk
+                for word_idx in range(word_count)
+            ]
+            random.shuffle(units)
+            emit(units)
+
+        chunk: List[Tuple[int, int, int, int]] = []
+        chunk_start = lines[0][0] if lines else 0
+        for line in lines:
+            global_idx = line[0]
+            if chunk and global_idx >= chunk_start + WINDOW_LINES:
+                emit_shuffled(chunk)
+                chunk = []
+                chunk_start = global_idx
+            chunk.append(line)
+        if chunk:
+            emit_shuffled(chunk)
+
         return notes
 
     def _create_word_note(

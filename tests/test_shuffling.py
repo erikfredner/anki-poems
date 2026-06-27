@@ -31,19 +31,35 @@ Line 5"""
         (2, 2, 1), (2, 2, 2),
     }
 
-    # Line ordering must be preserved: all words of line N come before line N+1
-    seen_lines: list = []
-    for note in notes:
-        match = re.match(r"Stanza (\d+), Line (\d+)", note.fields[1])
-        line_id = (int(match.group(1)), int(match.group(2)))
-        if not seen_lines or seen_lines[-1] != line_id:
-            seen_lines.append(line_id)
-
-    assert seen_lines == [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2)]
-
     # No pass: tags
     for note in notes:
         assert not any(tag.startswith("pass:") for tag in note.tags)
+
+
+def test_shuffle_groups_clozes_by_window():
+    # 30 single-word-pair lines, one stanza. With WINDOW_LINES=13, chunks are
+    # lines 1-13, 14-26, 27-30 (global line index == line number - 1 here).
+    poem_text = "\n".join(f"Line {i}" for i in range(1, 31))
+
+    random.seed(7)
+    notes = build_notes(poem_text, "Window Test", "Author", shuffle_stanzas=True, wrap_lines=False)
+
+    line_order = []
+    for note in notes:
+        match = re.match(r"Stanza 1, Line (\d+)", note.fields[1])
+        assert match is not None
+        line_order.append(int(match.group(1)))
+
+    # Each line contributes 2 word clozes -> chunk boundaries at 26 and 52.
+    chunk1, chunk2, chunk3 = line_order[:26], line_order[26:52], line_order[52:]
+
+    # Chunks stay in poem order and each holds exactly its window's lines.
+    assert set(chunk1) == set(range(1, 14))
+    assert set(chunk2) == set(range(14, 27))
+    assert set(chunk3) == set(range(27, 31))
+
+    # Within the first window, lines interleave instead of marching in order.
+    assert chunk1 != sorted(chunk1)
 
 
 def test_shuffled_guid_is_stable_across_random_order():
