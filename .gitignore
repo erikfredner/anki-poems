@@ -209,5 +209,8 @@ __marimo__/
 # Generated Anki packages
 *.apkg
 
+# Local poem collection (kept on disk, not tracked)
+poems/
+
 # macOS
 .DS_Store
